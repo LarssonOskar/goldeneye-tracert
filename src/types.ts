@@ -25,6 +25,8 @@ export interface NodeInfo {
   asn: string | null;
   lat: number | null;
   lon: number | null;
+  /** Number of distinct responders seen at this TTL (ECMP paths). */
+  replyCount?: number;
 }
 
 export interface MissionState {

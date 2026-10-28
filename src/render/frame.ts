@@ -735,7 +735,9 @@ function drawDashboard(
   if (bottom > row + 2) {
     screen.put(colA, row + 2, truncate(origin.org, colAW), "dim");
     const ip = activeNode?.ip ? `${activeNode.ip}` : "--";
-    screen.put(colB, row + 2, truncate(ip, colBW), "bright");
+    const extraPaths = Math.max(0, (activeNode?.replyCount ?? 1) - 1);
+    const ipText = extraPaths > 0 ? `${ip}  +${extraPaths}` : ip;
+    screen.put(colB, row + 2, truncate(ipText, colBW), "bright");
   }
   if (bottom > row + 3) {
     screen.put(colA, row + 3, truncate(origin.coords, colAW), "dim");

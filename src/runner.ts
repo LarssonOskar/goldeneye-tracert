@@ -14,7 +14,11 @@ export interface RunOptions {
   signal?: AbortSignal;
   /** Override the binary, mainly for tests and unusual systems. */
   command?: string;
+  /** Probe protocol on unix. macOS is setuid and supports ICMP unprivileged. */
+  protocol?: TraceProtocol;
 }
+
+export type TraceProtocol = "icmp" | "udp";
 
 export interface RunResult {
   header: TracerouteHeader | null;
@@ -26,13 +30,19 @@ export interface TraceRunner {
   run(target: string, options: RunOptions): Promise<RunResult>;
 }
 
-function buildArgs(target: string, maxHops: number, windows: boolean): string[] {
+export function buildTracerouteArgs(
+  target: string,
+  maxHops: number,
+  windows: boolean,
+  protocol: TraceProtocol = "udp",
+): string[] {
   const ipv6 = target.includes(":");
   if (windows) {
     return ["-d", "-h", String(maxHops), "-w", "1000", ...(ipv6 ? ["-6"] : []), target];
   }
   return [
     "-n",
+    ...(protocol === "icmp" ? ["-I"] : []),
     "-q",
     "3",
     "-w",
@@ -48,7 +58,12 @@ export class SystemTraceRunner implements TraceRunner {
   async run(target: string, options: RunOptions): Promise<RunResult> {
     const windows = process.platform === "win32";
     const command = options.command ?? (windows ? "tracert" : "traceroute");
-    const args = buildArgs(target, options.maxHops, windows);
+    const args = buildTracerouteArgs(
+      target,
+      options.maxHops,
+      windows,
+      options.protocol ?? "udp",
+    );
     const started = Date.now();
 
     return await new Promise<RunResult>((resolve, reject) => {

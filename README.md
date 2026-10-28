@@ -16,7 +16,7 @@
 ║ ORIGIN Stockholm, SE   →   ACTIVE Tokyo, JP   268.2ms   ROUTE LOCK 100%                ║
 ╠════════════════════════════════════════════════════════════════════════════════════════╣
 ║ › TARGET LOCKED // ORBITAL SOLUTION CONVERGED                                          ║
-╚═┤ GOLDENEYE TRACE v0.2.0 ├═════════════════════════════════════════════════════════════╝
+╚═┤ GOLDENEYE TRACE v0.3.0 ├═════════════════════════════════════════════════════════════╝
 ```
 
 ![GoldenEye Tracert running a locked demo mission](docs/preview.png)
@@ -27,6 +27,7 @@ The route is real. The satellite theater is not.
 
 - Runs the system `traceroute` (or `tracert` on Windows) and streams hops into the UI as they arrive.
 - Sends three probes per hop and merges multi-line ECMP responders, matching normal traceroute behavior instead of treating one silent probe as a lost hop.
+- Defaults to ICMP probes on macOS/Windows, which reaches targets that filter UDP; use `--protocol udp` to match a plain `traceroute` run.
 - Looks up each public hop through [ip-api.com](https://ip-api.com/) in batches, with [ipwho.is](https://ipwho.is/) as a fallback. Results are cached for seven days.
 - Locates your own public origin through [ifconfig.co](https://ifconfig.co/), so the route starts where you are.
 - Draws a Natural Earth world map in Unicode braille, with a red great-circle route, pulsing reticle, city codes and live telemetry.
@@ -101,6 +102,7 @@ goldeneye-tracert --demo
 | `-d, --demo` | Simulate a round-the-world trace (Stockholm → Tokyo, with a LAN hop and a timeout). |
 | `-m, --max-hops <n>` | Maximum hops, 1–64 (default `30`). |
 | `-t, --theme <name>` | `gold` (default), `green` or `ice`. |
+| `--protocol <name>` | `icmp` or `udp`. Defaults to ICMP on macOS/Windows and UDP on Linux. |
 | `--once` | Render one final frame and exit. Automatic when stdout is not a TTY. |
 | `--json` | Print the final mission state as JSON instead of drawing. |
 | `--no-geo` | Skip IP geolocation. Useful offline or when you do not want lookups. |
@@ -114,7 +116,7 @@ goldeneye-tracert --demo
 
 | Key | Action |
 | --- | --- |
-| `q` / `Esc` / `Ctrl+C` | Close the uplink and restore the terminal. |
+| `q` / `Ctrl+C` | Close the uplink and restore the terminal. |
 | `Space` | Pause / resume the route animation and demo feed. |
 | `r` | Retrace the current target. |
 | `t` | Cycle gold → green → ice. |
@@ -164,6 +166,14 @@ The land mask is generated from [Natural Earth 1:50m land](https://www.naturalea
 ```sh
 npm run build:land
 ```
+
+### Protocols and ECMP paths
+
+macOS/Windows default to ICMP probes because they often reach targets that silently drop UDP. Linux defaults to UDP so the command works without extra privileges; use `--protocol icmp` with the required capabilities if ICMP works better on your network. Windows always uses `tracert` and therefore ICMP.
+
+Each hop is probed three times. If several ECMP gateways answer for the same TTL, all replies are parsed, the active node shows `+N`, and the event log records `+N ECMP`. The map plots the fastest responder as the representative node; it does not draw separate ECMP branches or pin a single flow. That is the same trade-off normal `traceroute` makes, but with the extra responders made visible.
+
+Not reaching the target is often the target or its edge network filtering probes. Try `--protocol icmp` (the default on macOS) or `--protocol udp` to see which works for that network. `TARGET LOCKED` only appears when the final responder really is the resolved target IP.
 
 ## Privacy
 

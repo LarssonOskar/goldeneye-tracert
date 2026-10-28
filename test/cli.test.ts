@@ -86,7 +86,16 @@ const tokyo: GeoResult = {
 const baseHops: HopLine[] = [
   { ttl: 1, ip: "192.168.1.1", rttMs: 1.2, timedOut: false },
   { ttl: 2, ip: "62.119.252.49", rttMs: 3.4, timedOut: false },
-  { ttl: 3, ip: "203.0.113.7", rttMs: 120.5, timedOut: false },
+  {
+    ttl: 3,
+    ip: "203.0.113.7",
+    rttMs: 120.5,
+    timedOut: false,
+    replies: [
+      { ip: "203.0.113.7", rttMs: 120.5 },
+      { ip: "198.51.100.9", rttMs: 124.2 },
+    ],
+  },
 ];
 
 test("runs a trace end to end and renders a locked target", async () => {
@@ -114,6 +123,7 @@ test("runs a trace end to end and renders a locked target", async () => {
   for (const line of lines) assert.equal(line.length, 120);
   assert.match(text, /Tokyo/);
   assert.match(text, /TARGET LOCKED/);
+  assert.match(text, /203\.0\.113\.7\s+\+1/);
 });
 
 test("reports no target lock when the target is never reached", async () => {

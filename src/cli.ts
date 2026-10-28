@@ -5,9 +5,10 @@ import { parseArgs } from "node:util";
 import { demoMission } from "./demo.ts";
 import { createGeoProvider, isPublicIp, type GeoProvider, type GeoResult } from "./geo-lookup.ts";
 import { smoothCamera, WORLD_CAMERA, type MapCamera } from "./camera.ts";
+import { stripTerminalSequences } from "./keys.ts";
 import { renderBoot } from "./render/boot.ts";
 import { cameraForState, renderFrame } from "./render/frame.ts";
-import { createTraceRunner, type TraceRunner } from "./runner.ts";
+import { createTraceRunner, type TraceProtocol, type TraceRunner } from "./runner.ts";
 import { formatCoordinate } from "./geo.ts";
 import type { HopLine } from "./traceroute.ts";
 import { VERSION } from "./version.ts";
@@ -60,6 +61,7 @@ interface CliOptions {
   demo: boolean;
   maxHops: number;
   theme: ThemeName;
+  protocol: TraceProtocol;
   once: boolean;
   json: boolean;
   color: boolean;
@@ -91,6 +93,7 @@ function parseCli(args: string[], deps: CliDeps): CliOptions {
       demo: { type: "boolean", short: "d" },
       "max-hops": { type: "string", short: "m" },
       theme: { type: "string", short: "t" },
+      protocol: { type: "string" },
       once: { type: "boolean" },
       json: { type: "boolean" },
       "no-color": { type: "boolean" },
@@ -113,6 +116,12 @@ function parseCli(args: string[], deps: CliDeps): CliOptions {
     throw new Error("--max-hops must be between 1 and 64.");
   }
 
+  const defaultProtocol: TraceProtocol = process.platform === "linux" ? "udp" : "icmp";
+  const protocol = (values.protocol ?? defaultProtocol) as TraceProtocol;
+  if (protocol !== "icmp" && protocol !== "udp") {
+    throw new Error(`Unknown protocol "${protocol}". Choose icmp or udp.`);
+  }
+
   const width = values.width === undefined ? deps.width : Number(values.width);
   const height = values.height === undefined ? deps.height : Number(values.height);
   if (width !== undefined && (!Number.isFinite(width) || width < 40)) {
@@ -133,6 +142,7 @@ function parseCli(args: string[], deps: CliDeps): CliOptions {
     demo: values.demo ?? false,
     maxHops: Math.floor(maxHops),
     theme,
+    protocol,
     once: values.once ?? false,
     json: values.json ?? false,
     color,
@@ -156,6 +166,7 @@ Options:
   -d, --demo            simulate a round-the-world trace
   -m, --max-hops <n>    maximum hops (default 30)
   -t, --theme <name>    gold, green or ice (default gold)
+      --protocol <name> icmp or udp (default: icmp on macOS/Windows, udp on Linux)
       --once            render one frame and exit
       --json            print the mission state as JSON
       --no-geo          skip geolocation lookups
@@ -215,6 +226,7 @@ function nodeFromHop(hop: HopLine): NodeInfo {
     asn: null,
     lat: null,
     lon: null,
+    replyCount: Math.max(1, hop.replies?.length ?? 1),
   };
 }
 
@@ -245,7 +257,15 @@ function addHop(state: MissionState, hop: NodeInfo, now: number): void {
   } else if (hop.local) {
     addLog(state, "trace", `HOP ${ttl}  ${hop.ip ?? "--"}  LOCAL SEGMENT`, now);
   } else {
-    addLog(state, "trace", `HOP ${ttl}  ${hop.ip ?? "--"}  ${hop.rttMs?.toFixed(1) ?? "--"} ms`, now);
+    const extraPaths = Math.max(0, (hop.replyCount ?? 1) - 1);
+    addLog(
+      state,
+      "trace",
+      `HOP ${ttl}  ${hop.ip ?? "--"}  ${hop.rttMs?.toFixed(1) ?? "--"} ms${
+        extraPaths > 0 ? `  +${extraPaths} ECMP` : ""
+      }`,
+      now,
+    );
   }
   if (hop.city) {
     addLog(
@@ -293,11 +313,13 @@ async function runMissionOnce(
 ): Promise<MissionState> {
   const now = deps.now();
   const state = createMission(target, now, false);
+  addLog(state, "sys", `PROBE MODE // ${options.protocol.toUpperCase()}`, now);
   const geo = options.geo ? deps.geo : null;
   const originPromise = geo ? geo.locateSelf().catch(() => null) : Promise.resolve(null);
 
   const result = await deps.runner.run(target, {
     maxHops: options.maxHops,
+    protocol: options.protocol,
     onHeader: (header) => {
       state.targetIp = header.ip;
     },
@@ -403,6 +425,7 @@ function startReal(session: Session, target: string, options: CliOptions, deps: 
   const generation = session.generation;
   const { state } = session;
   const geo = options.geo ? deps.geo : null;
+  addLog(state, "sys", `PROBE MODE // ${options.protocol.toUpperCase()}`, deps.now());
 
   if (geo) {
     void geo
@@ -422,6 +445,7 @@ function startReal(session: Session, target: string, options: CliOptions, deps: 
   void deps.runner
     .run(target, {
       maxHops: options.maxHops,
+      protocol: options.protocol,
       signal: abort.signal,
       onHeader: (header) => {
         if (generation !== session.generation) return;
@@ -619,10 +643,10 @@ async function runInteractive(
   };
 
   const onData = (chunk: string | Buffer): void => {
-    const text = chunk.toString();
+    const text = stripTerminalSequences(chunk.toString());
     const now = deps.now();
     for (const key of text) {
-      if (key === "\u0003" || key === "q" || key === "\u001b") {
+      if (key === "\u0003" || key === "q" || key === "Q") {
         finish(0);
         return;
       }
@@ -632,9 +656,9 @@ async function runInteractive(
       }
       if (key === " ") {
         session.state.paused = !session.state.paused;
-      } else if (key === "r") {
+      } else if (key === "r" || key === "R") {
         restart();
-      } else if (key === "t") {
+      } else if (key === "t" || key === "T") {
         themeIndex = (themeIndex + 1) % THEMES.length;
       }
     }
