@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import {
-  parseHopLine,
+  parseHopBlock,
   parseTracerouteHeader,
   type HopLine,
   type TracerouteHeader,
@@ -34,9 +34,9 @@ function buildArgs(target: string, maxHops: number, windows: boolean): string[] 
   return [
     "-n",
     "-q",
-    "1",
+    "3",
     "-w",
-    "1",
+    "2",
     "-m",
     String(maxHops),
     ...(ipv6 ? ["-6"] : []),
@@ -66,10 +66,11 @@ export class SystemTraceRunner implements TraceRunner {
         else resolve({ header, hops, durationMs: Date.now() - started });
       };
 
+      const timeoutMs = Math.max(120_000, options.maxHops * 7000 + 30_000);
       const timeout = setTimeout(() => {
         child.kill("SIGKILL");
-        finish(new Error(`traceroute timed out after 120s`));
-      }, 120_000);
+        finish(new Error(`traceroute timed out after ${Math.round(timeoutMs / 1000)}s`));
+      }, timeoutMs);
 
       const abort = (): void => {
         child.kill("SIGKILL");
@@ -107,21 +108,52 @@ export class SystemTraceRunner implements TraceRunner {
 
       if (child.stdout) {
         const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
+        let bufferedTtl: number | null = null;
+        let bufferedText = "";
+
+        const emitHop = (hop: HopLine): void => {
+          if (hops.some((candidate) => candidate.ttl === hop.ttl)) return;
+          hops.push(hop);
+          options.onHop?.(hop);
+        };
+
+        const flushHop = (): void => {
+          if (bufferedTtl === null) return;
+          const hop = parseHopBlock(bufferedTtl, bufferedText);
+          bufferedTtl = null;
+          bufferedText = "";
+          if (hop) emitHop(hop);
+        };
+
         lines.on("line", (line) => {
           const parsedHeader = parseTracerouteHeader(line);
           if (parsedHeader) {
+            flushHop();
             if (!header) {
               header = parsedHeader;
               options.onHeader?.(parsedHeader);
             }
             return;
           }
-          const hop = parseHopLine(line);
-          if (!hop) return;
-          if (hops.some((candidate) => candidate.ttl === hop.ttl)) return;
-          hops.push(hop);
-          options.onHop?.(hop);
+
+          const ttlMatch = line.match(/^\s*(\d+)\s+(.*)$/);
+          if (ttlMatch) {
+            flushHop();
+            bufferedTtl = Number(ttlMatch[1]);
+            bufferedText = ttlMatch[2] ?? "";
+            return;
+          }
+
+          // Continuation lines carry the alternate ECMP responders.
+          if (bufferedTtl !== null && /^\s+\S/.test(line) && !/^Trace complete/i.test(line.trim())) {
+            bufferedText += ` ${line.trim()}`;
+            return;
+          }
+
+          flushHop();
         });
+
+        lines.on("close", flushHop);
       }
 
       child.on("close", (code) => {

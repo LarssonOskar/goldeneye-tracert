@@ -13,6 +13,8 @@ test("reads the traceroute header from stderr", { skip: process.platform === "wi
 
   assert.equal(result.header?.ip, "203.0.113.7");
   assert.equal(result.header?.target, "example.com");
-  assert.equal(result.hops.length, 3);
+  assert.equal(result.hops.length, 4);
   assert.equal(result.hops[1]?.timedOut, true);
+  assert.equal(result.hops[3]?.ip, "62.119.252.49");
+  assert.equal(result.hops[3]?.replies?.length, 2);
 });

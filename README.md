@@ -16,7 +16,7 @@
 ║ ORIGIN Stockholm, SE   →   ACTIVE Tokyo, JP   268.2ms   ROUTE LOCK 100%                ║
 ╠════════════════════════════════════════════════════════════════════════════════════════╣
 ║ › TARGET LOCKED // ORBITAL SOLUTION CONVERGED                                          ║
-╚═┤ GOLDENEYE TRACE v0.1.1 ├═════════════════════════════════════════════════════════════╝
+╚═┤ GOLDENEYE TRACE v0.1.2 ├═════════════════════════════════════════════════════════════╝
 ```
 
 ![GoldenEye Tracert running a locked demo mission](docs/preview.png)
@@ -26,6 +26,7 @@ The route is real. The satellite theater is not.
 ## What it does
 
 - Runs the system `traceroute` (or `tracert` on Windows) and streams hops into the UI as they arrive.
+- Sends three probes per hop and merges multi-line ECMP responders, matching normal traceroute behavior instead of treating one silent probe as a lost hop.
 - Looks up each public hop through [ip-api.com](https://ip-api.com/) in batches, with [ipwho.is](https://ipwho.is/) as a fallback. Results are cached for seven days.
 - Locates your own public origin through [ifconfig.co](https://ifconfig.co/), so the route starts where you are.
 - Draws a Natural Earth world map in Unicode braille, with a lat/lon graticule, glowing great-circle route, pulsing reticle, city codes and live telemetry.

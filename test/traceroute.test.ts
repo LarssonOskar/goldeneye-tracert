@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseHopLine, parseTracerouteHeader } from "../src/traceroute.ts";
+import { parseHopBlock, parseHopLine, parseTracerouteHeader } from "../src/traceroute.ts";
 
 test("parses a macOS traceroute hop", () => {
   const hop = parseHopLine(" 4  62.119.252.49  17.281 ms");
@@ -55,6 +55,40 @@ test("parses an IPv6 hop", () => {
   assert.equal(hop.ttl, 3);
   assert.equal(hop.ip, "2001:db8::1");
   assert.equal(hop.rttMs, 12.4);
+});
+
+test("parses an ECMP hop block with multiple responders", () => {
+  const hop = parseHopBlock(
+    4,
+    "62.119.252.53 (62.119.252.53)  16.879 ms   62.119.252.49 (62.119.252.49)  16.349 ms  16.995 ms",
+  );
+
+  assert.ok(hop);
+  assert.equal(hop.ttl, 4);
+  assert.equal(hop.timedOut, false);
+  assert.equal(hop.ip, "62.119.252.49");
+  assert.equal(hop.rttMs, 16.349);
+  assert.deepEqual(hop.replies, [
+    { ip: "62.119.252.53", rttMs: 16.879 },
+    { ip: "62.119.252.49", rttMs: 16.349 },
+  ]);
+});
+
+test("deduplicates the hostname and IP copies in a hop block", () => {
+  const hop = parseHopBlock(1, "192.168.10.1 (192.168.10.1)  2.681 ms  1.714 ms  1.932 ms");
+
+  assert.ok(hop);
+  assert.equal(hop.ip, "192.168.10.1");
+  assert.equal(hop.rttMs, 2.681);
+  assert.deepEqual(hop.replies, [{ ip: "192.168.10.1", rttMs: 2.681 }]);
+});
+
+test("parses a timed-out hopped block", () => {
+  const hop = parseHopBlock(9, "* * *");
+
+  assert.ok(hop);
+  assert.equal(hop.timedOut, true);
+  assert.deepEqual(hop.replies, []);
 });
 
 test("ignores the traceroute header", () => {
