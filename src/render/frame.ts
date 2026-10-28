@@ -1,4 +1,10 @@
 import {
+  cameraBounds,
+  distanceToMultiple,
+  fitCamera,
+  type MapCamera,
+} from "../camera.ts";
+import {
   formatCoordinate,
   interpolateGreatCircle,
   routeDistanceKm,
@@ -31,10 +37,8 @@ export interface FrameOptions {
   theme?: ThemeName;
   labels?: boolean;
   grid?: boolean;
+  camera?: MapCamera;
 }
-
-const MAP_BOUNDS: GeoBounds = { west: -180, east: 180, south: -60, north: 84 };
-const MAP_LAT_SPAN = MAP_BOUNDS.north - MAP_BOUNDS.south;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -124,24 +128,50 @@ function noise(x: number, y: number): number {
   return ((value ^ (value >>> 16)) >>> 0) / 4_294_967_295;
 }
 
-function isGridLine(lat: number, lon: number): boolean {
-  const latMod = ((lat % 30) + 30) % 30;
-  const lonMod = ((lon % 30) + 30) % 30;
-  const latDistance = Math.min(latMod, 30 - latMod);
-  const lonDistance = Math.min(lonMod, 30 - lonMod);
-  return latDistance < 0.85 || lonDistance < 0.95;
+function gridStepForSpan(lonSpan: number): number {
+  if (lonSpan >= 300) return 30;
+  if (lonSpan >= 120) return 15;
+  if (lonSpan >= 50) return 10;
+  if (lonSpan >= 22) return 5;
+  if (lonSpan >= 8) return 2;
+  return 1;
 }
 
-function isPrimeLine(lat: number, lon: number): boolean {
-  return Math.abs(lat) < 0.8 || Math.abs(lon) < 0.8;
+function labelStepsForSpan(lonSpan: number): { lon: number; lat: number } {
+  if (lonSpan >= 300) return { lon: 60, lat: 30 };
+  if (lonSpan >= 120) return { lon: 30, lat: 15 };
+  if (lonSpan >= 50) return { lon: 10, lat: 10 };
+  if (lonSpan >= 22) return { lon: 5, lat: 5 };
+  if (lonSpan >= 8) return { lon: 2, lat: 2 };
+  return { lon: 1, lat: 1 };
 }
 
-function drawTerrain(canvas: BrailleCanvas, bounds: GeoBounds, grid: boolean): void {
+function isGridLine(
+  lat: number,
+  lon: number,
+  step: number,
+  latTolerance: number,
+  lonTolerance: number,
+): boolean {
+  return distanceToMultiple(lat, step) < latTolerance || distanceToMultiple(lon, step) < lonTolerance;
+}
+
+function drawTerrain(
+  canvas: BrailleCanvas,
+  bounds: GeoBounds,
+  grid: boolean,
+  gridStep: number,
+): void {
   const mask = getLandMask();
+  const lonSpan = bounds.east - bounds.west;
+  const latSpan = bounds.north - bounds.south;
+  const lonTolerance = (lonSpan / canvas.dotWidth) * 1.1;
+  const latTolerance = (latSpan / canvas.dotHeight) * 1.1;
+
   for (let y = 0; y < canvas.dotHeight; y += 1) {
-    const lat = bounds.north - ((y + 0.5) / canvas.dotHeight) * MAP_LAT_SPAN;
+    const lat = bounds.north - ((y + 0.5) / canvas.dotHeight) * latSpan;
     for (let x = 0; x < canvas.dotWidth; x += 1) {
-      const lon = bounds.west + ((x + 0.5) / canvas.dotWidth) * 360;
+      const lon = bounds.west + ((x + 0.5) / canvas.dotWidth) * lonSpan;
       const maskX = clamp(Math.floor(((lon + 180) / 360) * LAND_WIDTH), 0, LAND_WIDTH - 1);
       const maskY = clamp(Math.floor(((90 - lat) / 180) * LAND_HEIGHT), 0, LAND_HEIGHT - 1);
 
@@ -164,8 +194,13 @@ function drawTerrain(canvas: BrailleCanvas, bounds: GeoBounds, grid: boolean): v
         } else if (noise(x, y) < 0.08) {
           canvas.plot(x, y, 1);
         }
-      } else if (grid && isGridLine(lat, lon) && (x + y) % 6 === 0) {
-        canvas.plot(x, y, isPrimeLine(lat, lon) ? 1 : 0);
+      } else if (
+        grid &&
+        isGridLine(lat, lon, gridStep, latTolerance, lonTolerance) &&
+        (x + y) % 6 === 0
+      ) {
+        const prime = Math.abs(lat) < latTolerance * 1.2 || Math.abs(lon) < lonTolerance * 1.2;
+        canvas.plot(x, y, prime ? 1 : 0);
       }
     }
   }
@@ -253,21 +288,84 @@ function drawRoute(
   canvas.circle(dotX, dotY, 2, 3, true);
 }
 
-interface MapRect {
+export interface MapRect {
   x: number;
   y: number;
   w: number;
   h: number;
 }
 
+export interface MapMetrics {
+  compact: boolean;
+  mapH: number;
+  mapTitleY: number;
+  mapBottom: number;
+  dashTop: number;
+  rect: MapRect;
+}
+
+export function getMapMetrics(width: number, height: number): MapMetrics {
+  const w = Math.max(40, Math.floor(width));
+  const h = Math.max(16, Math.floor(height));
+  const compact = w < 100 || h < 32;
+  const innerW = w - 4;
+  const idealMapH = Math.round(innerW * 0.2) + 2;
+  const minDash = compact ? 5 : 9;
+  const maxMapH = h - 4 - 3 - minDash;
+  const mapH = Math.max(8, Math.min(idealMapH, maxMapH));
+  const mapTitleY = 4;
+  const mapBottom = mapTitleY + mapH - 1;
+  const dashTop = mapBottom + 1;
+  return {
+    compact,
+    mapH,
+    mapTitleY,
+    mapBottom,
+    dashTop,
+    rect: { x: 2, y: mapTitleY + 1, w: innerW, h: mapH - 2 },
+  };
+}
+
+/**
+ * Camera target for the currently revealed part of the route. The caller can
+ * smooth this over time, or let renderFrame use it directly for static frames.
+ */
+export function cameraForState(state: MissionState, width: number, height: number): MapCamera {
+  const metrics = getMapMetrics(width, height);
+  const aspect = metrics.rect.w / (metrics.rect.h * 2);
+  const stations = routeStations(state);
+  const visibleCount = Math.max(1, Math.min(stations.length, Math.ceil(state.reveal) + 1));
+  const points: GeoPoint[] = [];
+  for (const station of stations.slice(0, visibleCount)) {
+    const node = station.node;
+    if (typeof node.lat === "number" && typeof node.lon === "number") {
+      points.push({ lat: node.lat, lon: node.lon });
+    }
+  }
+  return fitCamera(points, aspect);
+}
+
 function key(x: number, y: number): string {
   return `${x},${y}`;
+}
+
+function formatDegreeLabel(
+  value: number,
+  step: number,
+  positive: string,
+  negative: string,
+): string {
+  const rounded = step < 1 ? Number(value.toFixed(1)) : Math.round(value);
+  if (rounded === 0) return "0°";
+  const digits = step < 1 ? 1 : 0;
+  return `${Math.abs(rounded).toFixed(digits)}${rounded > 0 ? positive : negative}`;
 }
 
 function drawMapLabels(
   screen: Screen,
   rect: MapRect,
   projection: GeoProjection,
+  bounds: GeoBounds,
   stations: readonly RouteStation[],
   reveal: number,
   active: GeoPoint | null,
@@ -276,17 +374,28 @@ function drawMapLabels(
 ): void {
   if (rect.w < 70) return;
 
-  for (const lon of [-120, -60, 0, 60, 120]) {
+  const steps = labelStepsForSpan(bounds.east - bounds.west);
+  for (
+    let lon = Math.ceil(bounds.west / steps.lon) * steps.lon;
+    lon < bounds.east;
+    lon += steps.lon
+  ) {
+    if (lon <= -180 || lon >= 180) continue;
     const point = projection.project({ lat: 0, lon });
-    const label = lon === 0 ? "0°" : `${Math.abs(lon)}${lon < 0 ? "W" : "E"}`;
+    const label = formatDegreeLabel(lon, steps.lon, "E", "W");
     const x = rect.x + Math.round(point.x) - Math.floor(label.length / 2);
-    screen.put(x, rect.y + rect.h - 1, label, "grid");
+    screen.put(x, rect.y + rect.h - 1, label, "dim");
   }
 
-  for (const lat of [60, 30, 0, -30]) {
-    const point = projection.project({ lat, lon: -180 });
-    const label = lat === 0 ? "0°" : `${Math.abs(lat)}${lat > 0 ? "N" : "S"}`;
-    screen.put(rect.x, rect.y + Math.round(point.y), label, "grid");
+  for (
+    let lat = Math.ceil(bounds.south / steps.lat) * steps.lat;
+    lat < bounds.north;
+    lat += steps.lat
+  ) {
+    if (lat <= -90 || lat >= 90) continue;
+    const point = projection.project({ lat, lon: bounds.west });
+    const label = formatDegreeLabel(lat, steps.lat, "N", "S");
+    screen.put(rect.x, rect.y + Math.round(point.y), label, "dim");
   }
 
   const occupied = new Set<string>();
@@ -618,7 +727,7 @@ function drawDashboard(
   screen.put(colB, row, "ACTIVE NODE", "dim");
   if (bottom > row + 1) {
     screen.put(colA, row + 1, truncate(origin.city, colAW), "mid");
-    const rttText = formatRtt(activeNode?.rttMs ?? null);
+    const rttText = activeNode && activeNode.ttl !== null ? formatRtt(activeNode.rttMs) : "--";
     const cityWidth = colBW > 17 ? colBW - rttText.length - 2 : colBW;
     screen.put(colB, row + 1, truncate(active.city, cityWidth), "hot");
     if (colBW > 17) screen.put(colB + colBW - rttText.length, row + 1, rttText, "accent");
@@ -760,21 +869,13 @@ export function renderFrame(state: MissionState, options: FrameOptions): string[
   const labels = options.labels ?? true;
   const grid = options.grid ?? true;
   const theme = themeByName(options.theme ?? "gold");
-  const compact = width < 100 || height < 32;
+  const metrics = getMapMetrics(width, height);
+  const { compact, mapTitleY, mapBottom, dashTop, rect } = metrics;
 
   const screen = new Screen(width, height);
   screen.box(0, 0, width, height, "frame");
   screen.put(2, 0, "┤ SATELLITE UPLINK TERMINAL ├", "dim");
   screen.putRight(width - 3, 0, "[ CLASSIFIED // 001 ]", "grid");
-
-  const innerW = width - 4;
-  const idealMapH = Math.round(innerW * 0.2) + 2;
-  const minDash = compact ? 5 : 9;
-  const maxMapH = height - 4 - 3 - minDash;
-  const mapH = Math.max(8, Math.min(idealMapH, maxMapH));
-  const mapTitleY = 4;
-  const mapBottom = mapTitleY + mapH - 1;
-  const dashTop = mapBottom + 1;
 
   drawHeader(screen, state, now);
   screen.separator(3, "frame");
@@ -784,24 +885,29 @@ export function renderFrame(state: MissionState, options: FrameOptions): string[
   const activeIndex = activeStationIndex(stations, state.reveal);
   const activeNode = stations[activeIndex]?.node ?? state.hops.at(-1) ?? state.origin;
   const coords = activeNode ? nodeLine(activeNode).coords : "--";
+  const camera = options.camera ?? cameraForState(state, width, height);
+  const aspect = rect.w / (rect.h * 2);
+  const bounds = cameraBounds(camera, aspect);
+  const zoom = 360 / (bounds.east - bounds.west);
+  const zoomLabel = zoom >= 10 ? `${Math.round(zoom)}x` : `${zoom.toFixed(1)}x`;
 
   drawRule(
     screen,
     mapTitleY,
-    "ORBITAL TRACK // SAT-06",
+    `ORBITAL TRACK // SAT-06 // ZOOM ${zoomLabel}`,
     `${coords}  //  ${state.phase === "locked" ? "TARGET LOCKED" : state.phase === "incomplete" ? "NO LOCK" : state.paused ? "HOLD" : "LIVE FEED"}`,
     state.phase === "locked" ? "hot" : state.phase === "incomplete" ? "warn" : "dim",
   );
 
-  const rect: MapRect = { x: 2, y: mapTitleY + 1, w: innerW, h: mapH - 2 };
-  const projection = createProjection(rect.w, rect.h, MAP_BOUNDS);
+  const gridStep = gridStepForSpan(bounds.east - bounds.west);
+  const projection = createProjection(rect.w, rect.h, bounds);
   const canvas = new BrailleCanvas(rect.w, rect.h);
-  drawTerrain(canvas, MAP_BOUNDS, grid);
+  drawTerrain(canvas, bounds, grid, gridStep);
   drawRoute(canvas, projection, stations, state.reveal, now);
   canvas.render(screen, rect.x, rect.y);
 
   if (labels) {
-    drawMapLabels(screen, rect, projection, stations, state.reveal, active, state.phase, now);
+    drawMapLabels(screen, rect, projection, bounds, stations, state.reveal, active, state.phase, now);
   }
 
   screen.put(2, mapBottom, "├", "frame");

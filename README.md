@@ -16,7 +16,7 @@
 ║ ORIGIN Stockholm, SE   →   ACTIVE Tokyo, JP   268.2ms   ROUTE LOCK 100%                ║
 ╠════════════════════════════════════════════════════════════════════════════════════════╣
 ║ › TARGET LOCKED // ORBITAL SOLUTION CONVERGED                                          ║
-╚═┤ GOLDENEYE TRACE v0.1.2 ├═════════════════════════════════════════════════════════════╝
+╚═┤ GOLDENEYE TRACE v0.2.0 ├═════════════════════════════════════════════════════════════╝
 ```
 
 ![GoldenEye Tracert running a locked demo mission](docs/preview.png)
@@ -29,12 +29,19 @@ The route is real. The satellite theater is not.
 - Sends three probes per hop and merges multi-line ECMP responders, matching normal traceroute behavior instead of treating one silent probe as a lost hop.
 - Looks up each public hop through [ip-api.com](https://ip-api.com/) in batches, with [ipwho.is](https://ipwho.is/) as a fallback. Results are cached for seven days.
 - Locates your own public origin through [ifconfig.co](https://ifconfig.co/), so the route starts where you are.
-- Draws a Natural Earth world map in Unicode braille, with a lat/lon graticule, glowing great-circle route, pulsing reticle, city codes and live telemetry.
+- Draws a Natural Earth world map in Unicode braille, with a red great-circle route, pulsing reticle, city codes and live telemetry.
+- Uses an adaptive camera: start at world scale, zoom into the first city, then pull back just enough to keep the growing route visible. The current scale is shown as `ZOOM` in the map header.
 - Interpolates great-circle arcs and splits them at the antimeridian, so a Honolulu → Tokyo hop wraps across the Pacific instead of cutting across the whole map.
 - Reports `TARGET LOCKED` only when the final hop really is the resolved target. Otherwise you get `NO TARGET LOCK`.
 - Boots with an orbital-array startup sequence, then lets you pause, retrace and switch themes without leaving the terminal.
 
 ![Route being acquired live, with a partial great-circle path and active reticle](docs/preview-live.png)
+
+### Adaptive camera
+
+The camera starts at world scale, zooms into the first city, and then pulls back as the route grows. The `ZOOM` label in the map header shows the current scale.
+
+![City-level camera zoom around Stockholm](docs/preview-zoom.png)
 
 ## Requirements
 
@@ -152,7 +159,7 @@ Ice: ![Ice theme](docs/preview-ice.png)
 4. **Draw** — `src/render/braille.ts` gives each character cell a 2×4 braille dot matrix. `src/render/frame.ts` composes the map, reticle, labels and telemetry panels; `src/render/boot.ts` handles the startup sequence. The whole frame is written to the alternate screen at ~15 fps.
 5. **Reveal** — hops are plotted one at a time along their great-circle arcs. When the route reaches the resolved target, the reticle locks; otherwise the trace ends with `NO TARGET LOCK`.
 
-The land mask is generated from [Natural Earth 1:110m land](https://www.naturalearthdata.com/) (public domain) and baked into `src/data/land.ts` as a gzipped mask. To regenerate it:
+The land mask is generated from [Natural Earth 1:50m land](https://www.naturalearthdata.com/) (public domain) and baked into `src/data/land.ts` as a gzipped mask. To regenerate it:
 
 ```sh
 npm run build:land
@@ -189,6 +196,7 @@ npm run preview:boot
 npm run preview:green
 npm run preview:ice
 npm run preview:live
+npm run preview:zoom
 ```
 
 ## Credits

@@ -25,6 +25,7 @@ export function demoMission(): MissionState {
     countryCode: "SE",
     lat: 59.3293,
     lon: 18.0686,
+    ip: "203.0.113.1",
     org: "Telenor Norge AS",
     asn: "AS2119",
   });

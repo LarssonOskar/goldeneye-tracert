@@ -4,8 +4,9 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { demoMission } from "./demo.ts";
 import { createGeoProvider, isPublicIp, type GeoProvider, type GeoResult } from "./geo-lookup.ts";
+import { smoothCamera, WORLD_CAMERA, type MapCamera } from "./camera.ts";
 import { renderBoot } from "./render/boot.ts";
-import { renderFrame } from "./render/frame.ts";
+import { cameraForState, renderFrame } from "./render/frame.ts";
 import { createTraceRunner, type TraceRunner } from "./runner.ts";
 import { formatCoordinate } from "./geo.ts";
 import type { HopLine } from "./traceroute.ts";
@@ -351,6 +352,7 @@ interface Session {
   geoBusy: boolean;
   lastGeoFlush: number;
   generation: number;
+  camera: MapCamera;
   restart: () => void;
 }
 
@@ -535,6 +537,7 @@ async function runInteractive(
     geoBusy: false,
     lastGeoFlush: bootStart,
     generation: 0,
+    camera: { ...WORLD_CAMERA },
     restart: () => undefined,
   };
 
@@ -561,6 +564,7 @@ async function runInteractive(
           color: options.color,
           now,
           theme,
+          camera: session.camera,
         });
     write(`\x1b[H${lines.join("\n")}`);
   };
@@ -598,6 +602,7 @@ async function runInteractive(
     session.geoBusy = false;
     session.state = options.demo ? createDemoState(deps.now()) : createMission(target, deps.now(), false);
     session.state.startedAt = deps.now();
+    session.camera = { ...WORLD_CAMERA };
     lastFrame = deps.now();
     if (options.demo) startDemo(session, deps.now, () => undefined);
     else startReal(session, target, options, deps);
@@ -658,6 +663,11 @@ async function runInteractive(
       advance(session, options, deps, dt, () => {
         if (options.beep) write("\x07");
       });
+      session.camera = smoothCamera(
+        session.camera,
+        cameraForState(session.state, width, height),
+        dt,
+      );
     }
     draw(now);
   }, FRAME_MS);

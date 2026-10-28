@@ -31,13 +31,38 @@ const frame =
           now: 13_200,
           theme,
         })
-      : renderFrame(demoMission(), {
-          width,
-          height,
-          color: true,
-          now: 12_400,
-          theme,
-        });
+      : mode === "city"
+        ? renderFrame(cityMission(), {
+            width,
+            height,
+            color: true,
+            now: 5_200,
+            theme,
+          })
+        : renderFrame(demoMission(), {
+            width,
+            height,
+            color: true,
+            now: 12_400,
+            theme,
+          });
+
+function cityMission() {
+  const state = demoMission();
+  state.hops = state.hops.slice(0, 3);
+  state.reveal = 0;
+  state.activeHop = -1;
+  state.phase = "tracing";
+  state.finishedAt = null;
+  state.traceComplete = false;
+  state.logs = [
+    { at: 120, kind: "sys", text: "ORBITAL ARRAY ONLINE // SAT-06" },
+    { at: 430, kind: "sys", text: "TRACE INITIATED // 11 HOPS MAX" },
+    { at: 980, kind: "trace", text: "HOP 01  192.168.10.1  LOCAL GATEWAY" },
+    { at: 2140, kind: "geo", text: "NODE 02  STOCKHOLM SE  59.33N 18.07E" },
+  ];
+  return state;
+}
 
 function liveMission() {
   const state = demoMission();

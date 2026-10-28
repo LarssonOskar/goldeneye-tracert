@@ -1,11 +1,11 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 
-const WIDTH = 720;
-const HEIGHT = 360;
+const WIDTH = 4320;
+const HEIGHT = 2160;
 const SOURCE =
   process.argv[2] ??
-  "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_land.geojson";
+  "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_land.geojson";
 const source = JSON.parse(
   SOURCE.startsWith("http") ? await (await fetch(SOURCE)).text() : readFileSync(SOURCE, "utf8"),
 );
@@ -54,7 +54,7 @@ for (let row = 0; row < HEIGHT; row += 1) {
 }
 
 const compressed = gzipSync(Buffer.from(mask), { level: 9 }).toString("base64");
-const output = `// Generated from Natural Earth 1:110m land (public domain).
+const output = `// Generated from Natural Earth 1:50m land (public domain).
 // ${WIDTH}x${HEIGHT} land mask, one byte per cell, gzip + base64.
 export const LAND_WIDTH = ${WIDTH};
 export const LAND_HEIGHT = ${HEIGHT};

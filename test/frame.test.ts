@@ -39,3 +39,24 @@ test("renders without overflowing a compact terminal", () => {
   }
   assert.match(lines.join("\n"), /GOLDENEYE/);
 });
+
+test("zooms in on the first city before the route expands", () => {
+  const state = demoMission();
+  state.hops = state.hops.slice(0, 3);
+  state.reveal = 0;
+  state.activeHop = -1;
+  state.phase = "tracing";
+  state.finishedAt = null;
+  state.traceComplete = false;
+
+  const frame = renderFrame(state, {
+    width: 120,
+    height: 40,
+    color: false,
+    now: 5000,
+    theme: "gold",
+  }).join("\n");
+
+  assert.match(frame, /ZOOM 20x/);
+  assert.match(frame, /59\.33N 18\.07E/);
+});
