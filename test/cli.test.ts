@@ -4,6 +4,7 @@ import { main, type CliDeps } from "../src/cli.ts";
 import type { GeoProvider, GeoResult } from "../src/geo-lookup.ts";
 import type { TraceRunner } from "../src/runner.ts";
 import type { HopLine } from "../src/traceroute.ts";
+import { VERSION } from "../src/version.ts";
 
 function capture() {
   const chunks: string[] = [];
@@ -165,7 +166,7 @@ test("prints demo state as JSON", async () => {
 
   assert.equal(code, 0);
   const parsed = JSON.parse(out.text()) as { version: string; state: { phase: string; demo: boolean } };
-  assert.equal(parsed.version, "0.1.0");
+  assert.equal(parsed.version, VERSION);
   assert.equal(parsed.state.demo, true);
   assert.equal(parsed.state.phase, "locked");
 });

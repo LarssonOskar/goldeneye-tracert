@@ -8,6 +8,7 @@ import {
 import { getLandMask, LAND_HEIGHT, LAND_WIDTH } from "../land.ts";
 import { createProjection, type GeoBounds, type GeoProjection } from "../map.ts";
 import { themeByName, type StyleRole } from "../theme.ts";
+import { VERSION } from "../version.ts";
 import {
   cityCode,
   routeStations,
@@ -212,14 +213,7 @@ function drawSegment(
     if (previousPoint) {
       canvas.line(previousPoint.x * 2, previousPoint.y * 4, point.x * 2, point.y * 4, 3);
     }
-
-    const dotX = Math.round(point.x * 2);
-    const dotY = Math.round(point.y * 4);
-    canvas.plot(dotX - 1, dotY, 2);
-    canvas.plot(dotX + 1, dotY, 2);
-    canvas.plot(dotX, dotY - 1, 2);
-    canvas.plot(dotX, dotY + 1, 2);
-    canvas.plot(dotX, dotY, 3);
+    canvas.plot(Math.round(point.x * 2), Math.round(point.y * 4), 3);
 
     previousSample = sample;
     previousPoint = point;
@@ -754,7 +748,7 @@ function drawFooter(screen: Screen, state: MissionState, now: number): void {
   if (Math.floor(now / 450) % 2 === 0) screen.put(cursorX + 1, y + 1, "▌", "bright");
   screen.putRight(width - 3, y + 1, hints, "dim");
 
-  screen.put(2, screen.height - 1, "┤ GOLDENEYE TRACE v0.1 ├", "frame");
+  screen.put(2, screen.height - 1, `┤ GOLDENEYE TRACE v${VERSION} ├`, "frame");
   screen.putRight(width - 3, screen.height - 1, "[ CLASSIFIED ]", "grid");
 }
 

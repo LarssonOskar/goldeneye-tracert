@@ -9,6 +9,7 @@ import { renderFrame } from "./render/frame.ts";
 import { createTraceRunner, type TraceRunner } from "./runner.ts";
 import { formatCoordinate } from "./geo.ts";
 import type { HopLine } from "./traceroute.ts";
+import { VERSION } from "./version.ts";
 import {
   routeStations,
   targetReached,
@@ -18,7 +19,6 @@ import {
   type ThemeName,
 } from "./types.ts";
 
-const VERSION = "0.1.0";
 const BOOT_MS = 2100;
 const FRAME_MS = 66;
 const THEMES: ThemeName[] = ["gold", "green", "ice"];

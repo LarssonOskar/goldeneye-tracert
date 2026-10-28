@@ -1,4 +1,5 @@
 import { themeByName } from "../theme.ts";
+import { VERSION } from "../version.ts";
 import type { ThemeName } from "../types.ts";
 import { Screen, truncate } from "./screen.ts";
 
@@ -111,7 +112,7 @@ export function renderBoot(options: BootOptions): string[] {
   screen.put(2, height - 3, "AUTH  ████████████████  //  CLEARANCE ACCEPTED", "grid");
   screen.putRight(width - 3, height - 3, "[ PRESS ANY KEY TO SKIP ]", "dim");
   screen.hline(1, height - 2, width - 2, "─", "frame");
-  screen.put(2, height - 1, "┤ GOLDENEYE TRACE v0.1 ├", "frame");
+  screen.put(2, height - 1, `┤ GOLDENEYE TRACE v${VERSION} ├`, "frame");
   screen.putRight(width - 3, height - 1, "[ CLASSIFIED ]", "grid");
 
   return screen.lines(color, theme);

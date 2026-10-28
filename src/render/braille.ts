@@ -15,7 +15,7 @@ const LEVEL_ROLES: Record<CanvasLevel, StyleRole> = {
   0: "grid",
   1: "land",
   2: "coast",
-  3: "bright",
+  3: "route",
 };
 
 /**
