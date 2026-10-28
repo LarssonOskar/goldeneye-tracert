@@ -46,12 +46,16 @@ The route is real. The satellite theater is not.
 
 ### Homebrew
 
+Homebrew 7 requires third-party taps to be trusted explicitly:
+
 ```sh
 brew tap LarssonOskar/goldeneye
 brew trust LarssonOskar/goldeneye
 brew install goldeneye-tracert
 goldeneye-tracert --demo
 ```
+
+The formula lives in [LarssonOskar/homebrew-goldeneye](https://github.com/LarssonOskar/homebrew-goldeneye).
 
 ### From source
 
