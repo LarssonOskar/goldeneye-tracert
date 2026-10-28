@@ -48,6 +48,7 @@ The route is real. The satellite theater is not.
 
 ```sh
 brew tap LarssonOskar/goldeneye
+brew trust LarssonOskar/goldeneye
 brew install goldeneye-tracert
 goldeneye-tracert --demo
 ```
