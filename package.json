@@ -1,0 +1,49 @@
+{
+  "name": "goldeneye-tracert",
+  "version": "0.1.0",
+  "description": "A traceroute that looks like the GoldenEye satellite uplink terminal",
+  "homepage": "https://github.com/LarssonOskar/goldeneye-tracert#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LarssonOskar/goldeneye-tracert.git"
+  },
+  "bugs": {
+    "url": "https://github.com/LarssonOskar/goldeneye-tracert/issues"
+  },
+  "author": "Oskar Larsson",
+  "type": "module",
+  "bin": {
+    "goldeneye-tracert": "./src/cli.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "start": "node src/cli.ts",
+    "dev": "node --watch src/cli.ts --demo",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "preview": "node scripts/render-preview.mjs frame gold 132 44 docs/preview.png",
+    "preview:boot": "node scripts/render-preview.mjs boot gold 132 44 docs/boot.png",
+    "preview:green": "node scripts/render-preview.mjs frame green 132 44 docs/preview-green.png",
+    "preview:ice": "node scripts/render-preview.mjs frame ice 120 40 docs/preview-ice.png",
+    "preview:live": "node scripts/render-preview.mjs live gold 132 44 docs/preview-live.png",
+    "build:land": "node scripts/build-land.mjs"
+  },
+  "keywords": [
+    "traceroute",
+    "terminal",
+    "tui",
+    "goldeneye",
+    "network",
+    "ascii"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "typescript": "^5.9.0"
+  }
+}
