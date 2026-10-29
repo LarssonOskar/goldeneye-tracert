@@ -202,22 +202,48 @@ function drawTerrain(
     0.3,
   );
 
+  const lons = new Float32Array(canvas.dotWidth);
+  const lats = new Float32Array(canvas.dotHeight);
+  for (let x = 0; x < canvas.dotWidth; x += 1) {
+    lons[x] = bounds.west + ((x + 0.5) / canvas.dotWidth) * lonSpan;
+  }
   for (let y = 0; y < canvas.dotHeight; y += 1) {
-    const lat = bounds.north - ((y + 0.5) / canvas.dotHeight) * latSpan;
-    for (let x = 0; x < canvas.dotWidth; x += 1) {
-      const lon = bounds.west + ((x + 0.5) / canvas.dotWidth) * lonSpan;
-      const maskX = clamp(Math.floor(((lon + 180) / 360) * LAND_WIDTH), 0, LAND_WIDTH - 1);
-      const maskY = clamp(Math.floor(((90 - lat) / 180) * LAND_HEIGHT), 0, LAND_HEIGHT - 1);
+    lats[y] = bounds.north - ((y + 0.5) / canvas.dotHeight) * latSpan;
+  }
 
+  // Sample the mask once per braille dot, then derive coastlines from the
+  // rendered dot grid. The old fixed mask-radius test left gaps and clusters
+  // when the zoom level changed.
+  const landDots = new Uint8Array(canvas.dotWidth * canvas.dotHeight);
+  for (let y = 0; y < canvas.dotHeight; y += 1) {
+    const maskY = clamp(Math.floor(((90 - (lats[y] ?? 0)) / 180) * LAND_HEIGHT), 0, LAND_HEIGHT - 1);
+    for (let x = 0; x < canvas.dotWidth; x += 1) {
+      const maskX = clamp(
+        Math.floor((((lons[x] ?? 0) + 180) / 360) * LAND_WIDTH),
+        0,
+        LAND_WIDTH - 1,
+      );
       if (mask[maskY * LAND_WIDTH + maskX] === 1) {
+        landDots[y * canvas.dotWidth + x] = 1;
+      }
+    }
+  }
+
+  for (let y = 0; y < canvas.dotHeight; y += 1) {
+    const lat = lats[y] ?? 0;
+    for (let x = 0; x < canvas.dotWidth; x += 1) {
+      const lon = lons[x] ?? 0;
+      const index = y * canvas.dotWidth + x;
+      if (landDots[index] === 1) {
         canvas.markLand(x, y);
         let coastal = false;
-        for (let dy = -2; dy <= 2 && !coastal; dy += 1) {
-          for (let dx = -2; dx <= 2; dx += 1) {
-            const nx = maskX + dx;
-            const ny = maskY + dy;
-            if (nx < 0 || ny < 0 || nx >= LAND_WIDTH || ny >= LAND_HEIGHT) continue;
-            if (mask[ny * LAND_WIDTH + nx] !== 1) {
+        for (let dy = -1; dy <= 1 && !coastal; dy += 1) {
+          for (let dx = -1; dx <= 1; dx += 1) {
+            if (dx === 0 && dy === 0) continue;
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= canvas.dotWidth || ny >= canvas.dotHeight) continue;
+            if (landDots[ny * canvas.dotWidth + nx] === 0) {
               coastal = true;
               break;
             }
