@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { BrailleCanvas } from "../src/render/braille.ts";
 import { Screen } from "../src/render/screen.ts";
+import { THEMES } from "../src/theme.ts";
 
 test("route cells do not tint surrounding land dots", () => {
   const canvas = new BrailleCanvas(1, 1);
@@ -26,4 +27,18 @@ test("keeps neighboring land dots when no route crosses the cell", () => {
 
   assert.equal(screen.get(0, 0).codePointAt(0), 0x2800 + 0x01);
   assert.equal(screen.get(1, 0).codePointAt(0), 0x2800 + 0x01);
+});
+
+test("tints land cells even when they contain no plotted dots", () => {
+  const canvas = new BrailleCanvas(2, 1);
+  canvas.markLand(2, 0);
+  canvas.plot(0, 0, 1);
+
+  const screen = new Screen(2, 1);
+  canvas.render(screen, 0, 0);
+  const line = screen.lines(true, THEMES.gold)[0] ?? "";
+
+  assert.match(line, /\x1b\[48;2;35;23;5m/);
+  assert.equal(screen.get(0, 0).codePointAt(0), 0x2800 + 0x01);
+  assert.equal(screen.get(1, 0), " ");
 });

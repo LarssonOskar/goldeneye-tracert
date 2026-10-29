@@ -1,6 +1,6 @@
 {
   "name": "goldeneye-tracert",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "description": "A traceroute that looks like the GoldenEye satellite uplink terminal",
   "homepage": "https://github.com/LarssonOskar/goldeneye-tracert#readme",
   "repository": {

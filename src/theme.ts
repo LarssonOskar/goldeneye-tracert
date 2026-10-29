@@ -4,6 +4,7 @@ export type StyleRole =
   | "frame"
   | "grid"
   | "land"
+  | "landBg"
   | "coast"
   | "dim"
   | "mid"
@@ -28,6 +29,7 @@ export const THEMES: Record<ThemeName, Theme> = {
       frame: [112, 76, 16],
       grid: [42, 28, 6],
       land: [70, 46, 9],
+      landBg: [35, 23, 5],
       coast: [209, 138, 14],
       dim: [132, 94, 20],
       mid: [198, 138, 20],
@@ -47,6 +49,7 @@ export const THEMES: Record<ThemeName, Theme> = {
       frame: [38, 92, 56],
       grid: [14, 38, 24],
       land: [24, 68, 41],
+      landBg: [12, 34, 20],
       coast: [74, 190, 114],
       dim: [43, 125, 75],
       mid: [70, 195, 120],
@@ -66,6 +69,7 @@ export const THEMES: Record<ThemeName, Theme> = {
       frame: [38, 84, 104],
       grid: [14, 38, 50],
       land: [24, 64, 80],
+      landBg: [12, 32, 40],
       coast: [74, 180, 214],
       dim: [48, 118, 142],
       mid: [74, 190, 218],
@@ -88,4 +92,9 @@ export function themeByName(name: ThemeName): Theme {
 export function foreground(theme: Theme, role: StyleRole): string {
   const [r, g, b] = theme.colors[role];
   return `\x1b[38;2;${r};${g};${b}m`;
+}
+
+export function background(theme: Theme, role: StyleRole): string {
+  const [r, g, b] = theme.colors[role];
+  return `\x1b[48;2;${r};${g};${b}m`;
 }

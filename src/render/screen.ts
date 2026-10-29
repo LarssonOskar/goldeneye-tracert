@@ -1,11 +1,14 @@
-import { foreground, type StyleRole, type Theme } from "../theme.ts";
+import { background, foreground, type StyleRole, type Theme } from "../theme.ts";
 
 interface Cell {
   ch: string;
   role: StyleRole | null;
+  bg: StyleRole | null;
 }
 
 const RESET = "\x1b[0m";
+const RESET_FG = "\x1b[39m";
+const RESET_BG = "\x1b[49m";
 
 export class Screen {
   readonly width: number;
@@ -18,6 +21,7 @@ export class Screen {
     this.cells = Array.from({ length: this.width * this.height }, () => ({
       ch: " ",
       role: null,
+      bg: null,
     }));
   }
 
@@ -33,7 +37,14 @@ export class Screen {
     for (const cell of this.cells) {
       cell.ch = ch;
       cell.role = role;
+      cell.bg = null;
     }
+  }
+
+  setBackground(x: number, y: number, role: StyleRole | null): void {
+    if (!this.inside(x, y)) return;
+    const cell = this.cells[this.index(x, y)];
+    if (cell) cell.bg = role;
   }
 
   put(x: number, y: number, text: string, role: StyleRole | null = null, maxWidth = Infinity): void {
@@ -47,6 +58,7 @@ export class Screen {
         if (cell) {
           cell.ch = ch;
           cell.role = role;
+          cell.bg = null;
         }
       }
       cursor += 1;
@@ -65,6 +77,7 @@ export class Screen {
           if (cell) {
             cell.ch = ch;
             cell.role = role;
+            cell.bg = null;
           }
         }
       }
@@ -116,19 +129,24 @@ export class Screen {
     const output: string[] = [];
     for (let y = 0; y < this.height; y += 1) {
       let line = "";
-      let current: StyleRole | null = null;
+      let currentRole: StyleRole | null = null;
+      let currentBg: StyleRole | null = null;
       for (let x = 0; x < this.width; x += 1) {
         const cell = this.cells[this.index(x, y)];
         if (!cell) continue;
         if (color) {
-          if (cell.role !== current) {
-            line += cell.role === null ? RESET : foreground(theme, cell.role);
-            current = cell.role;
+          if (cell.bg !== currentBg) {
+            line += cell.bg === null ? RESET_BG : background(theme, cell.bg);
+            currentBg = cell.bg;
+          }
+          if (cell.role !== currentRole) {
+            line += cell.role === null ? RESET_FG : foreground(theme, cell.role);
+            currentRole = cell.role;
           }
         }
         line += cell.ch;
       }
-      if (color && current !== null) line += RESET;
+      if (color && (currentRole !== null || currentBg !== null)) line += RESET;
       output.push(line);
     }
     return output;

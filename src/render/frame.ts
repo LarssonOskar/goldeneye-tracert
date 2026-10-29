@@ -210,6 +210,7 @@ function drawTerrain(
       const maskY = clamp(Math.floor(((90 - lat) / 180) * LAND_HEIGHT), 0, LAND_HEIGHT - 1);
 
       if (mask[maskY * LAND_WIDTH + maskX] === 1) {
+        canvas.markLand(x, y);
         let coastal = false;
         for (let dy = -2; dy <= 2 && !coastal; dy += 1) {
           for (let dx = -2; dx <= 2; dx += 1) {

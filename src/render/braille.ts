@@ -33,6 +33,7 @@ export class BrailleCanvas {
   private readonly levels: Uint8Array;
   /** Route dots, isolated so their color cannot spill onto neighboring dots. */
   private readonly routeBits: Uint8Array;
+  private readonly landCells: Uint8Array;
 
   constructor(cols: number, rows: number) {
     this.cols = Math.max(1, Math.floor(cols));
@@ -42,6 +43,16 @@ export class BrailleCanvas {
     this.bits = new Uint8Array(this.cols * this.rows);
     this.levels = new Uint8Array(this.cols * this.rows);
     this.routeBits = new Uint8Array(this.cols * this.rows);
+    this.landCells = new Uint8Array(this.cols * this.rows);
+  }
+
+  /** Marks the character cell containing this dot as land, including empty cells. */
+  markLand(x: number, y: number): void {
+    const dotX = Math.round(x);
+    const dotY = Math.round(y);
+    if (dotX < 0 || dotY < 0 || dotX >= this.dotWidth || dotY >= this.dotHeight) return;
+    const index = Math.floor(dotY / 4) * this.cols + Math.floor(dotX / 2);
+    this.landCells[index] = 1;
   }
 
   plot(x: number, y: number, level: CanvasLevel): void {
@@ -105,17 +116,21 @@ export class BrailleCanvas {
       for (let col = 0; col < this.cols; col += 1) {
         const index = row * this.cols + col;
         const bits = this.bits[index] ?? 0;
-        if (bits === 0) continue;
-        const routeBits = this.routeBits[index] ?? 0;
-        if (routeBits !== 0) {
-          // A braille cell has one foreground color. Drawing the union of its
-          // land/grid and route dots would tint the surrounding dots red, which
-          // makes the route look wider than it is. Keep only route dots here.
-          screen.put(offsetX + col, offsetY + row, String.fromCharCode(BRAILLE_BASE + routeBits), "route");
-          continue;
+        if (bits !== 0) {
+          const routeBits = this.routeBits[index] ?? 0;
+          if (routeBits !== 0) {
+            // A braille cell has one foreground color. Drawing the union of its
+            // land/grid and route dots would tint the surrounding dots red, which
+            // makes the route look wider than it is. Keep only route dots here.
+            screen.put(offsetX + col, offsetY + row, String.fromCharCode(BRAILLE_BASE + routeBits), "route");
+          } else {
+            const level = (this.levels[index] ?? 0) as CanvasLevel;
+            screen.put(offsetX + col, offsetY + row, String.fromCharCode(BRAILLE_BASE + bits), LEVEL_ROLES[level]);
+          }
         }
-        const level = (this.levels[index] ?? 0) as CanvasLevel;
-        screen.put(offsetX + col, offsetY + row, String.fromCharCode(BRAILLE_BASE + bits), LEVEL_ROLES[level]);
+        if (this.landCells[index] === 1) {
+          screen.setBackground(offsetX + col, offsetY + row, "landBg");
+        }
       }
     }
   }

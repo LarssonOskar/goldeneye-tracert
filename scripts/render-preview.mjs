@@ -104,26 +104,39 @@ function escapeHtml(value) {
 
 function ansiToHtml(line) {
   let html = "";
-  let open = false;
-  const pattern = /\x1b\[38;2;(\d+);(\d+);(\d+)m|\x1b\[0m/g;
+  let foregroundColor = null;
+  let backgroundColor = null;
+  const pattern = /\x1b\[(0|39|49|38;2;(\d+);(\d+);(\d+)|48;2;(\d+);(\d+);(\d+))m/g;
   let last = 0;
+
+  const append = (text) => {
+    if (!text) return;
+    const styles = [];
+    if (foregroundColor) styles.push(`color:rgb(${foregroundColor.join(" ")})`);
+    if (backgroundColor) styles.push(`background-color:rgb(${backgroundColor.join(" ")})`);
+    html += styles.length
+      ? `<span style="${styles.join(";")}">${escapeHtml(text)}</span>`
+      : escapeHtml(text);
+  };
+
   for (const match of line.matchAll(pattern)) {
-    html += escapeHtml(line.slice(last, match.index));
+    append(line.slice(last, match.index));
     last = (match.index ?? 0) + match[0].length;
+
     if (match[0] === "\x1b[0m") {
-      if (open) {
-        html += "</span>";
-        open = false;
-      }
+      foregroundColor = null;
+      backgroundColor = null;
+    } else if (match[0] === "\x1b[39m") {
+      foregroundColor = null;
+    } else if (match[0] === "\x1b[49m") {
+      backgroundColor = null;
+    } else if (match[2]) {
+      foregroundColor = [match[2], match[3], match[4]];
     } else {
-      if (open) html += "</span>";
-      const [, r, g, b] = match;
-      html += `<span style="color:rgb(${r} ${g} ${b})">`;
-      open = true;
+      backgroundColor = [match[5], match[6], match[7]];
     }
   }
-  html += escapeHtml(line.slice(last));
-  if (open) html += "</span>";
+  append(line.slice(last));
   return html;
 }
 
