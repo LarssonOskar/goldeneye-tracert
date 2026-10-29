@@ -100,6 +100,8 @@ function logRole(kind: LogKind): StyleRole {
       return "mid";
     case "trace":
       return "dim";
+    case "spike":
+      return "branch";
     case "sys":
       return "dim";
     default:
@@ -943,7 +945,9 @@ function drawFooter(
         ? "[ENTER] GO  [ESC] CANCEL"
         : "[↵] GO  [ESC]"
     : width >= 112
-      ? "[Q]UIT  [SPACE]PAUSE  [R]ETRACE  [N]EW  [T]HEME"
+      ? state.phase === "locked"
+        ? "[Q]UIT  [SPACE]PAUSE  [R]ETRACE  [N]EW  [T]HEME  [S]SPIKE"
+        : "[Q]UIT  [SPACE]PAUSE  [R]ETRACE  [N]EW  [T]HEME"
       : width >= 76
         ? "[Q]UIT  [SPACE]PAUSE  [N]EW"
         : "[Q]UIT";
@@ -995,78 +999,91 @@ function drawFooter(
 }
 
 function drawSpikeOverlay(screen: Screen, spike: SpikeOverlay, now: number): void {
-  const width = Math.min(78, screen.width - 6);
-  const height = 13;
-  if (width < 48 || screen.height < 22) return;
+  const width = Math.min(68, screen.width - 6);
+  const height = 11;
+  if (width < 52 || screen.height < 20) return;
 
   const x = Math.floor((screen.width - width) / 2);
   const y = Math.max(2, Math.floor((screen.height - 3 - height) / 2));
   const elapsed = Math.max(0, now - spike.startedAt);
+  const left = x + 3;
+  const right = x + width - 4;
+
+  const typed = (value: string, start: number, msPerChar: number): string => {
+    const count = Math.floor((elapsed - start) / msPerChar);
+    if (count <= 0) return "";
+    return value.slice(0, Math.min(value.length, count));
+  };
 
   screen.fill(x, y, width, height, " ", null);
-  screen.box(x, y, width, height, "route");
-  screen.put(x + 3, y, "┤ SPIKE INJECTED ├", "hot");
-  screen.putRight(x + width - 4, y, "SEVERNAYA // 1995", "dim");
+  screen.box(x, y, width, height, "branch");
 
-  screen.put(x + 2, y + 1, "SATELLITE SPIKE // SAT-06", "dim");
-  screen.putRight(x + width - 4, y + 1, "COUNTER-TRACE BLOCKED", "warn");
+  screen.put(left, y, typed("┤ SPIKE INJECTED ├", 0, 22), "hot");
+  const place = "SEVERNAYA // 1995";
+  screen.put(right - place.length, y, typed(place, 260, 18), "dim");
 
-  const waveWidth = width - 4;
-  const phase = Math.floor(elapsed / 70);
-  const levels = "▁▂▃▄▅▆▇█";
-  for (let i = 0; i < waveWidth; i += 1) {
-    const position = i / Math.max(1, waveWidth - 1);
-    const peak = Math.exp(-Math.pow((position - 0.5) * 7, 2));
-    const wobble = (Math.sin((i + phase) * 0.6) + 1) / 2;
-    const level = Math.round(Math.max(0, Math.min(7, peak * 7 + wobble * 0.8)));
-    const role: StyleRole = level >= 6 ? "hot" : level >= 3 ? "route" : "branch";
-    screen.put(x + 2 + i, y + 2, levels[level] ?? "▁", role);
+  screen.put(left, y + 1, typed("SATELLITE SPIKE // SAT-06", 380, 15), "dim");
+  const blocked = "COUNTER-TRACE BLOCKED";
+  screen.put(right - blocked.length, y + 1, typed(blocked, 560, 13), "warn");
+
+  if (elapsed > 700) {
+    const waveWidth = width - 6;
+    const reveal = clamp(Math.floor(((elapsed - 700) / 900) * waveWidth), 1, waveWidth);
+    const phase = Math.floor(elapsed / 70);
+    const levels = "▁▂▃▄▅▆▇█";
+    for (let i = 0; i < reveal; i += 1) {
+      const position = i / Math.max(1, waveWidth - 1);
+      const peak = Math.exp(-Math.pow((position - 0.5) * 7, 2));
+      const wobble = (Math.sin((i + phase) * 0.6) + 1) / 2;
+      const level = Math.round(Math.max(0, Math.min(7, peak * 7 + wobble * 0.8)));
+      const role: StyleRole = level >= 6 ? "hot" : level >= 3 ? "route" : "branch";
+      screen.put(left - 1 + i, y + 2, levels[level] ?? "▁", role);
+    }
   }
 
-  screen.put(x + 2, y + 3, "DATA SPIKE", "hot");
-  screen.put(x + 14, y + 3, "//", "dim");
+  screen.put(left, y + 3, typed("DATA SPIKE", 1000, 20), "hot");
   screen.put(
-    x + 17,
+    left + 11,
     y + 3,
-    "ACTIVE",
+    typed("// ACTIVE", 1200, 16),
     Math.floor(elapsed / 220) % 2 === 0 ? "warn" : "dim",
   );
-  screen.putRight(x + width - 4, y + 3, "SLUGHEADS.EXE", "branch");
+  const slug = "SLUGHEADS.EXE";
+  screen.put(right - slug.length, y + 3, typed(slug, 900, 16), "branch");
 
   const quote = "Better luck next time, slugheads.";
-  const revealed = Math.min(quote.length, Math.max(0, Math.floor((elapsed - 650) / 24)));
+  const revealed = Math.min(quote.length, Math.max(0, Math.floor((elapsed - 1400) / 26)));
   const visibleQuote = quote.slice(0, revealed);
   screen.put(x + 4, y + 5, `"${visibleQuote}`, "hot");
   if (revealed < quote.length) {
     screen.put(x + 5 + visibleQuote.length, y + 5, "▌", "bright");
   } else {
     screen.put(x + 5 + quote.length, y + 5, "\"", "hot");
-    screen.putRight(x + width - 5, y + 6, "— BORIS GRISHENKO", "dim");
   }
 
-  if (elapsed > 2200) {
+  if (elapsed > 2300) {
+    const signature = "— BORIS GRISHENKO";
+    screen.put(right - signature.length, y + 6, typed(signature, 2300, 16), "dim");
+  }
+
+  if (elapsed > 2500) {
     const role: StyleRole = Math.floor(elapsed / 300) % 2 === 0 ? "hot" : "accent";
-    screen.put(x + 4, y + 8, "I AM INVINCIBLE!", role);
+    screen.put(left, y + 7, typed("I AM INVINCIBLE!", 2550, 30), role);
   }
 
-  const target = truncate(spike.target, Math.max(12, width - 28));
-  if (spike.ping === null) {
-    screen.put(x + 2, y + 10, "PING", "dim");
-    screen.put(x + 7, y + 10, truncate(target, width - 30), "mid");
-    screen.putRight(x + width - 4, y + 10, "WAITING //", "dim");
-  } else if (spike.ping.ok) {
-    screen.put(x + 2, y + 10, "PING", "dim");
-    screen.put(x + 7, y + 10, truncate(target, width - 30), "mid");
-    screen.putRight(
-      x + width - 4,
-      y + 10,
-      `${spike.ping.rttMs === null ? "--" : spike.ping.rttMs.toFixed(1)} ms  //  ACK`,
-      "hot",
-    );
-  } else {
-    screen.put(x + 2, y + 10, "PING", "dim");
-    screen.put(x + 7, y + 10, truncate(target, width - 30), "mid");
-    screen.putRight(x + width - 4, y + 10, "NO ACK", "warn");
+  if (elapsed > 1400) {
+    const target = truncate(spike.target, Math.max(12, width - 27));
+    screen.put(left, y + 9, typed("PING", 1400, 20), "dim");
+    screen.put(left + 6, y + 9, typed(target, 1450, 14), "mid");
+    if (spike.ping === null) {
+      screen.put(right - 9, y + 9, typed("WAITING //", 1600, 18), "dim");
+    } else if (spike.ping.ok) {
+      const status = `${spike.ping.rttMs === null ? "--" : spike.ping.rttMs.toFixed(1)} ms  //  ACK`;
+      screen.put(right - status.length, y + 9, typed(status, 1800, 12), "hot");
+    } else {
+      const status = "NO ACK";
+      screen.put(right - status.length, y + 9, typed(status, 1800, 16), "warn");
+    }
   }
 }
 

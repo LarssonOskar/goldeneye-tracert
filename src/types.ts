@@ -2,7 +2,7 @@ export type ThemeName = "gold" | "green" | "ice";
 
 export type MissionPhase = "tracing" | "locked" | "incomplete" | "error";
 
-export type LogKind = "sys" | "trace" | "geo" | "warn" | "ok" | "err";
+export type LogKind = "sys" | "trace" | "geo" | "warn" | "ok" | "err" | "spike";
 
 export interface LogLine {
   /** Milliseconds since the mission started. */

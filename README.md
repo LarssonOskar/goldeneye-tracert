@@ -16,7 +16,7 @@
 ║ ORIGIN Stockholm, SE   →   ACTIVE Tokyo, JP   268.2ms   ROUTE LOCK 100%                ║
 ╠════════════════════════════════════════════════════════════════════════════════════════╣
 ║ › TARGET LOCKED // ORBITAL SOLUTION CONVERGED                                          ║
-╚═┤ GOLDENEYE TRACE v0.5.0 ├═════════════════════════════════════════════════════════════╝
+╚═┤ GOLDENEYE TRACE v0.5.1 ├═════════════════════════════════════════════════════════════╝
 ```
 
 ![GoldenEye Tracert running a locked demo mission](docs/preview.png)
@@ -56,7 +56,7 @@ The camera starts at world scale, zooms into the first city, and then pulls back
 
 ### Easter egg: Severnaya spike
 
-When a trace really reaches its target, the uplink occasionally gets a visitor from Severnaya. A data spike animates across the overlay, a real one-shot `ping` is sent to the resolved IP, and Boris delivers the line:
+When a trace really reaches its target, the uplink quietly arms a shortcut. Press `s` to send a Severnaya spike: a data spike writes itself across a compact overlay, a real one-shot `ping` is sent to the resolved IP, and Boris delivers the line:
 
 ```text
 ┤ SPIKE INJECTED ├                                    SEVERNAYA // 1995
@@ -69,7 +69,7 @@ DATA SPIKE  // ACTIVE                                      SLUGHEADS.EXE
 PING 203.0.113.7                                              8.2 ms  //  ACK
 ```
 
-The ping is genuine: `ACK` shows the real round-trip time, and `NO ACK` appears when the target filters ICMP. It fires once per target per session, so `r` can retrace without replaying the joke. Targets like the demo's fictional `goldeneye.example` intentionally end in `NO ACK`.
+The ping is genuine: `ACK` shows the real round-trip time, and `NO ACK` appears when the target filters ICMP. The event log records `SPIKE SENT // COUNTER-TRACE BLOCKED`. Press `s` again to replay it, or Esc to dismiss the overlay early. Targets like the demo's fictional `goldeneye.example` intentionally end in `NO ACK`.
 
 This is a text-only homage to Boris Grishenko and his counter-trace spike in *GoldenEye* (1995). No film stills or other copyrighted assets are embedded.
 
@@ -151,6 +151,7 @@ goldeneye-tracert --demo
 | `Space` | Pause / resume the route animation and demo feed. |
 | `r` | Retrace the current target. |
 | `n` / `/` | Enter a new target or URL in the current session without restarting. |
+| `s` | When the target is locked, send the Severnaya spike (easter egg). |
 | `t` | Cycle gold → green → ice. |
 | any key during boot | Skip the boot sequence. |
 

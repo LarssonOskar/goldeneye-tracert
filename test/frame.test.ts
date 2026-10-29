@@ -99,4 +99,32 @@ test("renders the Severnaya spike easter egg", () => {
   assert.match(frame, /I AM INVINCIBLE!/);
   assert.match(frame, /BORIS GRISHENKO/);
   assert.match(frame, /8\.2 ms/);
+  assert.match(frame, /\[S\]SPIKE/);
+});
+
+test("types the Severnaya overlay in over time", () => {
+  const linesAt = (now: number): string =>
+    renderFrame(demoMission(), {
+      width: 120,
+      height: 40,
+      color: false,
+      now,
+      theme: "gold",
+      spike: {
+        startedAt: 0,
+        target: "172.67.205.50",
+        ping: null,
+      },
+    }).join("\n");
+
+  const early = linesAt(300);
+  assert.doesNotMatch(early, /slugheads/);
+  assert.doesNotMatch(early, /BORIS GRISHENKO/);
+  assert.doesNotMatch(early, /I AM INVINCIBLE!/);
+
+  const late = linesAt(4000);
+  assert.match(late, /Better luck next time, slugheads\./);
+  assert.match(late, /BORIS GRISHENKO/);
+  assert.match(late, /I AM INVINCIBLE!/);
+  assert.match(late, /WAITING/);
 });

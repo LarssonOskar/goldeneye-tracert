@@ -25,6 +25,7 @@ import {
 
 const BOOT_MS = 2100;
 const FRAME_MS = 66;
+const SPIKE_MS = 6200;
 const THEMES: ThemeName[] = ["gold", "green", "ice"];
 
 interface CliOutput {
@@ -589,7 +590,6 @@ async function runInteractive(
   let inputMode = false;
   let inputBuffer = "";
   let spike: { startedAt: number; target: string; ping: SpikePing | null } | null = null;
-  const spikedTargets = new Set<string>();
   let themeIndex = THEMES.indexOf(options.theme);
   let bootStart = deps.now();
   let lastFrame = bootStart;
@@ -699,12 +699,12 @@ async function runInteractive(
     else startReal(session, target, options, deps);
   };
 
-  const triggerSpike = (): void => {
-    if (spikedTargets.has(target)) return;
-    spikedTargets.add(target);
+  const sendSpike = (): void => {
+    if (spike || session.state.phase !== "locked") return;
     const spikeTarget = target;
     const address = session.state.targetIp ?? target;
-    spike = { startedAt: deps.now(), target: target, ping: null };
+    addLog(session.state, "spike", "SPIKE SENT // COUNTER-TRACE BLOCKED", deps.now());
+    spike = { startedAt: deps.now(), target: spikeTarget, ping: null };
     void pingOnce(address, 1500).then((result) => {
       if (!spike || spike.target !== spikeTarget) return;
       spike = {
@@ -756,6 +756,10 @@ async function runInteractive(
         finish(0);
         return;
       }
+      if (key === "\u001b" && spike) {
+        spike = null;
+        continue;
+      }
       if (now - bootStart < BOOT_MS) {
         bootStart = now - BOOT_MS;
         continue;
@@ -767,6 +771,8 @@ async function runInteractive(
         session.state.paused = !session.state.paused;
       } else if (key === "r" || key === "R") {
         restart();
+      } else if (key === "s" || key === "S") {
+        sendSpike();
       } else if (key === "t" || key === "T") {
         themeIndex = (themeIndex + 1) % THEMES.length;
       }
@@ -795,14 +801,13 @@ async function runInteractive(
       }
       advance(session, options, deps, dt, () => {
         if (options.beep) write("\x07");
-        triggerSpike();
       });
       session.camera = smoothCamera(
         session.camera,
         cameraForState(session.state, width, height),
         dt,
       );
-      if (spike && now - spike.startedAt > 5600) spike = null;
+      if (spike && now - spike.startedAt > SPIKE_MS) spike = null;
     }
     draw(now);
   }, FRAME_MS);
