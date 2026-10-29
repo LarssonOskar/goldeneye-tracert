@@ -31,6 +31,8 @@ export class BrailleCanvas {
   readonly dotHeight: number;
   private readonly bits: Uint8Array;
   private readonly levels: Uint8Array;
+  /** Route dots, isolated so their color cannot spill onto neighboring dots. */
+  private readonly routeBits: Uint8Array;
 
   constructor(cols: number, rows: number) {
     this.cols = Math.max(1, Math.floor(cols));
@@ -39,6 +41,7 @@ export class BrailleCanvas {
     this.dotHeight = this.rows * 4;
     this.bits = new Uint8Array(this.cols * this.rows);
     this.levels = new Uint8Array(this.cols * this.rows);
+    this.routeBits = new Uint8Array(this.cols * this.rows);
   }
 
   plot(x: number, y: number, level: CanvasLevel): void {
@@ -57,6 +60,9 @@ export class BrailleCanvas {
     this.bits[index] = existing | bit;
     const current = this.levels[index] ?? 0;
     if (level > current) this.levels[index] = level;
+    if (level === 4) {
+      this.routeBits[index] = (this.routeBits[index] ?? 0) | bit;
+    }
   }
 
   line(x0: number, y0: number, x1: number, y1: number, level: CanvasLevel): void {
@@ -100,6 +106,14 @@ export class BrailleCanvas {
         const index = row * this.cols + col;
         const bits = this.bits[index] ?? 0;
         if (bits === 0) continue;
+        const routeBits = this.routeBits[index] ?? 0;
+        if (routeBits !== 0) {
+          // A braille cell has one foreground color. Drawing the union of its
+          // land/grid and route dots would tint the surrounding dots red, which
+          // makes the route look wider than it is. Keep only route dots here.
+          screen.put(offsetX + col, offsetY + row, String.fromCharCode(BRAILLE_BASE + routeBits), "route");
+          continue;
+        }
         const level = (this.levels[index] ?? 0) as CanvasLevel;
         screen.put(offsetX + col, offsetY + row, String.fromCharCode(BRAILLE_BASE + bits), LEVEL_ROLES[level]);
       }
