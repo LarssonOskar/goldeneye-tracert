@@ -180,3 +180,26 @@ test("prints demo state as JSON", async () => {
   assert.equal(parsed.state.demo, true);
   assert.equal(parsed.state.phase, "locked");
 });
+
+test("runs the Homebrew update flow", async () => {
+  const out = capture();
+  let updates = 0;
+  const code = await main(["--update"], {
+    stdout: out.stream,
+    stderr: out.stream,
+    stdin: { isTTY: false },
+    env: {},
+    now: () => 1000,
+    runner: runner([]),
+    geo: null,
+    updateRunner: async () => {
+      updates += 1;
+      return 0;
+    },
+  });
+
+  assert.equal(code, 0);
+  assert.equal(updates, 1);
+  assert.match(out.text(), /updating through Homebrew/);
+  assert.match(out.text(), /Update complete/);
+});

@@ -13,6 +13,7 @@ import { cameraForState, renderFrame, type SpikePing } from "./render/frame.ts";
 import { createTraceRunner, type TraceProtocol, type TraceRunner } from "./runner.ts";
 import { formatCoordinate } from "./geo.ts";
 import type { HopLine } from "./traceroute.ts";
+import { checkForUpdate, runBrewUpdate, type UpdateInfo } from "./update.ts";
 import { VERSION } from "./version.ts";
 import {
   routeStations,
@@ -57,6 +58,7 @@ export interface CliDeps {
   geo: GeoProvider | null;
   width?: number;
   height?: number;
+  updateRunner?: () => Promise<number>;
 }
 
 interface CliOptions {
@@ -70,6 +72,8 @@ interface CliOptions {
   color: boolean;
   geo: boolean;
   beep: boolean;
+  update: boolean;
+  updateCheck: boolean;
   help: boolean;
   version: boolean;
   width: number | undefined;
@@ -102,6 +106,8 @@ function parseCli(args: string[], deps: CliDeps): CliOptions {
       "no-color": { type: "boolean" },
       "no-geo": { type: "boolean" },
       beep: { type: "boolean" },
+      update: { type: "boolean" },
+      "no-update-check": { type: "boolean" },
       width: { type: "string" },
       height: { type: "string" },
       help: { type: "boolean", short: "h" },
@@ -151,6 +157,8 @@ function parseCli(args: string[], deps: CliDeps): CliOptions {
     color,
     geo: !(values["no-geo"] ?? false),
     beep: values.beep ?? false,
+    update: values.update ?? false,
+    updateCheck: !(values["no-update-check"] ?? false),
     help: values.help ?? false,
     version: values.version ?? false,
     width,
@@ -175,13 +183,16 @@ Options:
       --no-geo          skip geolocation lookups
       --no-color        disable ANSI colors
       --beep            beep when the target is locked
+      --update          update goldeneye-tracert through Homebrew
+      --no-update-check disable the daily GitHub release check
       --width <cols>    override terminal width (testing)
       --height <rows>   override terminal height (testing)
   -h, --help            show this help
   -v, --version         show version
 
 Requires Node.js 22.18 or newer (TypeScript is stripped natively).
-Press Q to quit, SPACE to pause, R to retrace, N (or /) for a new target, T to cycle the theme.`;
+Press Q to quit, SPACE to pause, R to retrace, N (or /) for a new target, T to cycle the theme.
+When an update is available, press U to run the Homebrew upgrade.`;
 }
 
 function missionTime(state: MissionState, now: number): number {
@@ -591,6 +602,7 @@ async function runInteractive(
   let inputBuffer = "";
   let spikeConfirm = false;
   let spike: { startedAt: number; target: string; ping: SpikePing | null } | null = null;
+  let availableUpdate: UpdateInfo | null = null;
   let themeIndex = THEMES.indexOf(options.theme);
   let bootStart = deps.now();
   let lastFrame = bootStart;
@@ -654,9 +666,23 @@ async function runInteractive(
                 },
               }
             : {}),
+          ...(availableUpdate ? { update: { version: availableUpdate.latest } } : {}),
         });
     write(`\x1b[H${lines.join("\n")}`);
   };
+
+  if (options.updateCheck && !options.demo) {
+    void checkForUpdate({ currentVersion: VERSION }).then((info) => {
+      if (!info || finished) return;
+      availableUpdate = info;
+      addLog(
+        session.state,
+        "warn",
+        `UPDATE ${info.latest} AVAILABLE // PRESS U`,
+        deps.now(),
+      );
+    });
+  }
 
   const cleanup = (): void => {
     clearInterval(loop);
@@ -681,6 +707,29 @@ async function runInteractive(
     finished = true;
     cleanup();
     resolveExit(code);
+  };
+
+  const applyUpdate = (): void => {
+    if (!availableUpdate || finished) return;
+    cleanup();
+    finished = true;
+    const runner = deps.updateRunner ?? runBrewUpdate;
+    void (async () => {
+      let code = 1;
+      try {
+        code = await runner();
+      } catch {
+        code = 1;
+      }
+      if (code === 0) {
+        write("\nUpdate complete. Restart goldeneye-tracert to use the new version.\n");
+      } else {
+        deps.stderr.write(
+          "\ngoldeneye: update failed. Run `brew update && brew upgrade goldeneye-tracert` manually.\n",
+        );
+      }
+      resolveExit(code === 0 ? 0 : 1);
+    })();
   };
 
   const beginTrace = (nextTarget: string, nextDemo: boolean): void => {
@@ -794,6 +843,8 @@ async function runInteractive(
         restart();
       } else if (key === "s" || key === "S") {
         if (!spike && session.state.phase === "locked") spikeConfirm = true;
+      } else if (key === "u" || key === "U") {
+        if (availableUpdate) applyUpdate();
       } else if (key === "t" || key === "T") {
         themeIndex = (themeIndex + 1) % THEMES.length;
       }
@@ -880,6 +931,23 @@ export async function main(argv: string[], overrides: Partial<CliDeps> = {}): Pr
   if (options.version) {
     deps.stdout.write(`goldeneye-tracert ${VERSION}\n`);
     return 0;
+  }
+  if (options.update) {
+    deps.stdout.write(`goldeneye-tracert ${VERSION} // updating through Homebrew\n`);
+    let code = 1;
+    try {
+      code = await (deps.updateRunner ?? runBrewUpdate)();
+    } catch {
+      code = 1;
+    }
+    if (code === 0) {
+      deps.stdout.write("Update complete. Restart goldeneye-tracert to use the new version.\n");
+      return 0;
+    }
+    deps.stderr.write(
+      "goldeneye: update failed. Run `brew update && brew upgrade goldeneye-tracert` manually.\n",
+    );
+    return code;
   }
   if (!options.demo && !options.target) {
     deps.stderr.write("goldeneye: missing target. Try --demo or --help.\n");

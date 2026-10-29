@@ -47,6 +47,10 @@ export interface SpikeOverlay {
   ping: SpikePing | null;
 }
 
+export interface UpdateNotice {
+  version: string;
+}
+
 export interface FrameOptions {
   width: number;
   height: number;
@@ -58,6 +62,7 @@ export interface FrameOptions {
   camera?: MapCamera;
   prompt?: FooterPrompt;
   spike?: SpikeOverlay;
+  update?: UpdateNotice;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -935,11 +940,13 @@ function drawFooter(
   state: MissionState,
   now: number,
   prompt?: FooterPrompt,
+  update?: UpdateNotice,
 ): void {
   const width = screen.width;
   const y = screen.height - 3;
   screen.separator(y, "frame");
 
+  const updateHint = update ? "  [U]PDATE" : "";
   const hints = prompt
     ? width >= 96
       ? `[ENTER] ${prompt.action ?? "TRACE"}  [ESC] CANCEL`
@@ -947,9 +954,11 @@ function drawFooter(
         ? `[ENTER] ${prompt.action === "SEND" ? "SEND" : "GO"}  [ESC] CANCEL`
         : "[↵] GO  [ESC]"
     : width >= 112
-      ? state.phase === "locked"
-        ? "[Q]UIT  [SPACE]PAUSE  [R]ETRACE  [N]EW  [T]HEME  [S]SPIKE"
-        : "[Q]UIT  [SPACE]PAUSE  [R]ETRACE  [N]EW  [T]HEME"
+      ? `${
+          state.phase === "locked"
+            ? "[Q]UIT  [SPACE]PAUSE  [R]ETRACE  [N]EW  [T]HEME  [S]SPIKE"
+            : "[Q]UIT  [SPACE]PAUSE  [R]ETRACE  [N]EW  [T]HEME"
+        }${updateHint}`
       : width >= 76
         ? "[Q]UIT  [SPACE]PAUSE  [N]EW"
         : "[Q]UIT";
@@ -997,7 +1006,11 @@ function drawFooter(
   screen.putRight(width - 3, y + 1, hints, "dim");
 
   screen.put(2, screen.height - 1, `┤ GOLDENEYE TRACE v${VERSION} ├`, "frame");
-  screen.putRight(width - 3, screen.height - 1, "[ CLASSIFIED ]", "grid");
+  if (update && width >= 60) {
+    screen.putRight(width - 3, screen.height - 1, `[ UPDATE v${update.version} ]`, "warn");
+  } else {
+    screen.putRight(width - 3, screen.height - 1, "[ CLASSIFIED ]", "grid");
+  }
 }
 
 function drawSpikeOverlay(screen: Screen, spike: SpikeOverlay, now: number): void {
@@ -1139,7 +1152,7 @@ export function renderFrame(state: MissionState, options: FrameOptions): string[
 
   drawDashboard(screen, state, stations, dashTop, compact);
   if (options.spike) drawSpikeOverlay(screen, options.spike, now);
-  drawFooter(screen, state, now, options.prompt);
+  drawFooter(screen, state, now, options.prompt, options.update);
 
   return screen.lines(color, theme);
 }

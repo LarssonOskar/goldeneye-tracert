@@ -148,3 +148,17 @@ test("types the Severnaya overlay in over time", () => {
   assert.doesNotMatch(late, /INVINCIBLE/);
   assert.match(late, /WAITING/);
 });
+
+test("shows an available update in the footer", () => {
+  const frame = renderFrame(demoMission(), {
+    width: 132,
+    height: 44,
+    color: false,
+    now: 5000,
+    theme: "gold",
+    update: { version: "0.6.0" },
+  }).join("\n");
+
+  assert.match(frame, /\[ UPDATE v0\.6\.0 \]/);
+  assert.match(frame, /\[U\]PDATE/);
+});

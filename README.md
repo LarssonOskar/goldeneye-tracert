@@ -16,7 +16,7 @@
 ║ ORIGIN Stockholm, SE   →   ACTIVE Tokyo, JP   268.2ms   ROUTE LOCK 100%                ║
 ╠════════════════════════════════════════════════════════════════════════════════════════╣
 ║ › TARGET LOCKED // ORBITAL SOLUTION CONVERGED                                          ║
-╚═┤ GOLDENEYE TRACE v0.5.2 ├═════════════════════════════════════════════════════════════╝
+╚═┤ GOLDENEYE TRACE v0.6.0 ├═════════════════════════════════════════════════════════════╝
 ```
 
 ![GoldenEye Tracert running a locked demo mission](docs/preview.png)
@@ -100,6 +100,18 @@ goldeneye-tracert --demo
 
 The formula lives in [LarssonOskar/homebrew-goldeneye](https://github.com/LarssonOskar/homebrew-goldeneye).
 
+### Updating
+
+The interactive uplink checks the latest GitHub release once per day. When a newer version exists, the footer shows `[ UPDATE vX.Y.Z ]` and `[U]PDATE`, and the event log records `UPDATE vX.Y.Z AVAILABLE // PRESS U`. Press `u` to run `brew update` and `brew upgrade goldeneye-tracert`; the app restores the terminal, shows Homebrew's output, and exits so you can restart it.
+
+You can also update directly:
+
+```sh
+goldeneye-tracert --update
+```
+
+Use `--no-update-check` to skip the daily GitHub request, for example in scripts or on metered connections. `--demo` never performs an update check.
+
 ### From source
 
 ```sh
@@ -142,6 +154,8 @@ goldeneye-tracert --demo
 | `--no-geo` | Skip IP geolocation. Useful offline or when you do not want lookups. |
 | `--no-color` | Disable ANSI colors. |
 | `--beep` | Emit a terminal bell when the target locks. |
+| `--update` | Run `brew update` and `brew upgrade goldeneye-tracert`, then exit. |
+| `--no-update-check` | Disable the daily GitHub release check. |
 | `--width`, `--height` | Override terminal dimensions (handy for screenshots and tests). |
 | `-h, --help` | Show help. |
 | `-v, --version` | Show the version. |
@@ -155,6 +169,7 @@ goldeneye-tracert --demo
 | `r` | Retrace the current target. |
 | `n` / `/` | Enter a new target or URL in the current session without restarting. |
 | `s` | When the target is locked, open the Severnaya spike confirmation; Enter sends it. |
+| `u` | When an update is available, run the Homebrew upgrade and exit. |
 | `t` | Cycle gold → green → ice. |
 | any key during boot | Skip the boot sequence. |
 
@@ -214,7 +229,8 @@ Not reaching the target is often the target or its edge network filtering probes
 ## Privacy
 
 - Geolocation sends public hop IPs to ip-api.com (HTTP) and, on failure, ipwho.is (HTTPS). Use `--no-geo` to disable it entirely.
-- Nothing is sent anywhere else. The cache is local and can be removed with `rm -rf ~/.cache/goldeneye-tracert`.
+- The update check asks the GitHub Releases API for the latest version once per day. The result is cached in `~/.cache/goldeneye-tracert/update.json`. Use `--no-update-check` to disable it; `--demo` skips it too.
+- Nothing else is sent anywhere. The cache is local and can be removed with `rm -rf ~/.cache/goldeneye-tracert`.
 - The demo route is entirely fictional and makes no network requests.
 
 ## Development
