@@ -94,12 +94,33 @@ test("renders the Severnaya spike easter egg", () => {
 
   for (const line of lines) assert.equal(line.length, 120);
   const frame = lines.join("\n");
-  assert.match(frame, /SPIKE INJECTED/);
+  assert.match(frame, /SPIKE SENT/);
+  assert.doesNotMatch(frame, /SPIKE INJECTED/);
   assert.match(frame, /Better luck next time, slugheads\./);
-  assert.match(frame, /I AM INVINCIBLE!/);
+  assert.doesNotMatch(frame, /INVINCIBLE/);
   assert.match(frame, /BORIS GRISHENKO/);
   assert.match(frame, /8\.2 ms/);
   assert.match(frame, /\[S\]SPIKE/);
+});
+
+test("renders the spike confirmation prompt", () => {
+  const frame = renderFrame(demoMission(), {
+    width: 120,
+    height: 40,
+    color: false,
+    now: 5000,
+    theme: "gold",
+    prompt: {
+      label: "SEND SPIKE",
+      value: "203.0.113.7",
+      action: "SEND",
+    },
+  }).join("\n");
+
+  assert.match(frame, /SEND SPIKE/);
+  assert.match(frame, /203\.0\.113\.7/);
+  assert.match(frame, /\[ENTER\] SEND/);
+  assert.match(frame, /\[ESC\] CANCEL/);
 });
 
 test("types the Severnaya overlay in over time", () => {
@@ -120,11 +141,10 @@ test("types the Severnaya overlay in over time", () => {
   const early = linesAt(300);
   assert.doesNotMatch(early, /slugheads/);
   assert.doesNotMatch(early, /BORIS GRISHENKO/);
-  assert.doesNotMatch(early, /I AM INVINCIBLE!/);
 
   const late = linesAt(4000);
   assert.match(late, /Better luck next time, slugheads\./);
   assert.match(late, /BORIS GRISHENKO/);
-  assert.match(late, /I AM INVINCIBLE!/);
+  assert.doesNotMatch(late, /INVINCIBLE/);
   assert.match(late, /WAITING/);
 });

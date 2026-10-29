@@ -25,7 +25,7 @@ import {
 
 const BOOT_MS = 2100;
 const FRAME_MS = 66;
-const SPIKE_MS = 6200;
+const SPIKE_MS = 9000;
 const THEMES: ThemeName[] = ["gold", "green", "ice"];
 
 interface CliOutput {
@@ -589,6 +589,7 @@ async function runInteractive(
   let demoMode = options.demo;
   let inputMode = false;
   let inputBuffer = "";
+  let spikeConfirm = false;
   let spike: { startedAt: number; target: string; ping: SpikePing | null } | null = null;
   let themeIndex = THEMES.indexOf(options.theme);
   let bootStart = deps.now();
@@ -633,7 +634,17 @@ async function runInteractive(
           now,
           theme,
           camera: session.camera,
-          ...(inputMode ? { prompt: { label: "NEW TARGET", value: inputBuffer } } : {}),
+          ...(inputMode
+            ? { prompt: { label: "NEW TARGET", value: inputBuffer } }
+            : spikeConfirm
+              ? {
+                  prompt: {
+                    label: "SEND SPIKE",
+                    value: session.state.targetIp ?? target,
+                    action: "SEND",
+                  },
+                }
+              : {}),
           ...(!inputMode && spike
             ? {
                 spike: {
@@ -694,12 +705,14 @@ async function runInteractive(
     lastFrame = now;
     inputMode = false;
     inputBuffer = "";
+    spikeConfirm = false;
     spike = null;
     if (nextDemo) startDemo(session, deps.now, () => undefined);
     else startReal(session, target, options, deps);
   };
 
   const sendSpike = (): void => {
+    spikeConfirm = false;
     if (spike || session.state.phase !== "locked") return;
     const spikeTarget = target;
     const address = session.state.targetIp ?? target;
@@ -756,6 +769,14 @@ async function runInteractive(
         finish(0);
         return;
       }
+      if (spikeConfirm) {
+        if (key === "\u001b") {
+          spikeConfirm = false;
+        } else if (key === "\r" || key === "\n") {
+          sendSpike();
+        }
+        continue;
+      }
       if (key === "\u001b" && spike) {
         spike = null;
         continue;
@@ -772,7 +793,7 @@ async function runInteractive(
       } else if (key === "r" || key === "R") {
         restart();
       } else if (key === "s" || key === "S") {
-        sendSpike();
+        if (!spike && session.state.phase === "locked") spikeConfirm = true;
       } else if (key === "t" || key === "T") {
         themeIndex = (themeIndex + 1) % THEMES.length;
       }

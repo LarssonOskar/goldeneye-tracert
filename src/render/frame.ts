@@ -32,6 +32,8 @@ import { Screen, truncate } from "./screen.ts";
 export interface FooterPrompt {
   label: string;
   value: string;
+  /** Verb shown on the Enter hint. Defaults to TRACE. */
+  action?: string;
 }
 
 export interface SpikePing {
@@ -940,9 +942,9 @@ function drawFooter(
 
   const hints = prompt
     ? width >= 96
-      ? "[ENTER] TRACE  [ESC] CANCEL"
+      ? `[ENTER] ${prompt.action ?? "TRACE"}  [ESC] CANCEL`
       : width >= 64
-        ? "[ENTER] GO  [ESC] CANCEL"
+        ? `[ENTER] ${prompt.action === "SEND" ? "SEND" : "GO"}  [ESC] CANCEL`
         : "[↵] GO  [ESC]"
     : width >= 112
       ? state.phase === "locked"
@@ -1000,7 +1002,7 @@ function drawFooter(
 
 function drawSpikeOverlay(screen: Screen, spike: SpikeOverlay, now: number): void {
   const width = Math.min(68, screen.width - 6);
-  const height = 11;
+  const height = 10;
   if (width < 52 || screen.height < 20) return;
 
   const x = Math.floor((screen.width - width) / 2);
@@ -1018,7 +1020,7 @@ function drawSpikeOverlay(screen: Screen, spike: SpikeOverlay, now: number): voi
   screen.fill(x, y, width, height, " ", null);
   screen.box(x, y, width, height, "branch");
 
-  screen.put(left, y, typed("┤ SPIKE INJECTED ├", 0, 22), "hot");
+  screen.put(left, y, typed("┤ SPIKE SENT ├", 0, 22), "hot");
   const place = "SEVERNAYA // 1995";
   screen.put(right - place.length, y, typed(place, 260, 18), "dim");
 
@@ -1066,23 +1068,18 @@ function drawSpikeOverlay(screen: Screen, spike: SpikeOverlay, now: number): voi
     screen.put(right - signature.length, y + 6, typed(signature, 2300, 16), "dim");
   }
 
-  if (elapsed > 2500) {
-    const role: StyleRole = Math.floor(elapsed / 300) % 2 === 0 ? "hot" : "accent";
-    screen.put(left, y + 7, typed("I AM INVINCIBLE!", 2550, 30), role);
-  }
-
   if (elapsed > 1400) {
     const target = truncate(spike.target, Math.max(12, width - 27));
-    screen.put(left, y + 9, typed("PING", 1400, 20), "dim");
-    screen.put(left + 6, y + 9, typed(target, 1450, 14), "mid");
+    screen.put(left, y + 8, typed("PING", 1400, 20), "dim");
+    screen.put(left + 6, y + 8, typed(target, 1450, 14), "mid");
     if (spike.ping === null) {
-      screen.put(right - 9, y + 9, typed("WAITING //", 1600, 18), "dim");
+      screen.put(right - 9, y + 8, typed("WAITING //", 1600, 18), "dim");
     } else if (spike.ping.ok) {
       const status = `${spike.ping.rttMs === null ? "--" : spike.ping.rttMs.toFixed(1)} ms  //  ACK`;
-      screen.put(right - status.length, y + 9, typed(status, 1800, 12), "hot");
+      screen.put(right - status.length, y + 8, typed(status, 1800, 12), "hot");
     } else {
       const status = "NO ACK";
-      screen.put(right - status.length, y + 9, typed(status, 1800, 16), "warn");
+      screen.put(right - status.length, y + 8, typed(status, 1800, 16), "warn");
     }
   }
 }
