@@ -11,6 +11,15 @@ export interface LogLine {
   text: string;
 }
 
+export interface AlternateNode {
+  ip: string;
+  rttMs: number | null;
+  city: string | null;
+  countryCode: string | null;
+  lat: number | null;
+  lon: number | null;
+}
+
 export interface NodeInfo {
   ttl: number | null;
   ip: string | null;
@@ -27,6 +36,8 @@ export interface NodeInfo {
   lon: number | null;
   /** Number of distinct responders seen at this TTL (ECMP paths). */
   replyCount?: number;
+  /** Additional responders at the same TTL, with optional geolocation. */
+  alternates?: AlternateNode[];
 }
 
 export interface MissionState {
@@ -73,7 +84,11 @@ export function routeStations(state: MissionState): RouteStation[] {
 
 export function targetReached(state: MissionState): boolean {
   if (!state.targetIp) return false;
-  return state.hops.some((hop) => hop.ip === state.targetIp);
+  return state.hops.some(
+    (hop) =>
+      hop.ip === state.targetIp ||
+      (hop.alternates?.some((alternate) => alternate.ip === state.targetIp) ?? false),
+  );
 }
 
 const CITY_CODES: Record<string, string> = {

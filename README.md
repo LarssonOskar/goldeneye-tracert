@@ -16,7 +16,7 @@
 ║ ORIGIN Stockholm, SE   →   ACTIVE Tokyo, JP   268.2ms   ROUTE LOCK 100%                ║
 ╠════════════════════════════════════════════════════════════════════════════════════════╣
 ║ › TARGET LOCKED // ORBITAL SOLUTION CONVERGED                                          ║
-╚═┤ GOLDENEYE TRACE v0.3.0 ├═════════════════════════════════════════════════════════════╝
+╚═┤ GOLDENEYE TRACE v0.4.0 ├═════════════════════════════════════════════════════════════╝
 ```
 
 ![GoldenEye Tracert running a locked demo mission](docs/preview.png)
@@ -37,6 +37,16 @@ The route is real. The satellite theater is not.
 - Boots with an orbital-array startup sequence, then lets you pause, retrace and switch themes without leaving the terminal.
 
 ![Route being acquired live, with a partial great-circle path and active reticle](docs/preview-live.png)
+
+### Retarget without restarting
+
+Press `n` (or `/`) while the uplink is running, type a hostname or a full URL, and press Enter. The current trace is aborted and the same session immediately starts a fresh trace, keeping the theme and terminal state. Press Esc to cancel the prompt.
+
+```text
+› NEW TARGET > https://example.com/status                         [ENTER] TRACE  [ESC] CANCEL
+```
+
+The input is normalized, so `https://example.com/status`, `example.com/status` and `example.com:443` all become `example.com`.
 
 ### Adaptive camera
 
@@ -119,6 +129,7 @@ goldeneye-tracert --demo
 | `q` / `Ctrl+C` | Close the uplink and restore the terminal. |
 | `Space` | Pause / resume the route animation and demo feed. |
 | `r` | Retrace the current target. |
+| `n` / `/` | Enter a new target or URL in the current session without restarting. |
 | `t` | Cycle gold → green → ice. |
 | any key during boot | Skip the boot sequence. |
 
@@ -171,7 +182,7 @@ npm run build:land
 
 macOS/Windows default to ICMP probes because they often reach targets that silently drop UDP. Linux defaults to UDP so the command works without extra privileges; use `--protocol icmp` with the required capabilities if ICMP works better on your network. Windows always uses `tracert` and therefore ICMP.
 
-Each hop is probed three times. If several ECMP gateways answer for the same TTL, all replies are parsed, the active node shows `+N`, and the event log records `+N ECMP`. The map plots the fastest responder as the representative node; it does not draw separate ECMP branches or pin a single flow. That is the same trade-off normal `traceroute` makes, but with the extra responders made visible.
+Each hop is probed three times. If several ECMP gateways answer for the same TTL, all replies are parsed, the active node shows `+N`, and the event log records `+N ECMP`. The primary route follows the fastest responder; faint dark-red branches connect the previous hop to the alternate responders when their coordinates are available. It still does not pin a single flow or draw a complete second route, but the alternate paths are no longer hidden.
 
 Not reaching the target is often the target or its edge network filtering probes. Try `--protocol icmp` (the default on macOS) or `--protocol udp` to see which works for that network. `TARGET LOCKED` only appears when the final responder really is the resolved target IP.
 

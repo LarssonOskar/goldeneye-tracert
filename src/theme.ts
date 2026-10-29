@@ -13,7 +13,8 @@ export type StyleRole =
   | "warn"
   | "error"
   | "ok"
-  | "route";
+  | "route"
+  | "branch";
 
 export interface Theme {
   name: ThemeName;
@@ -37,6 +38,7 @@ export const THEMES: Record<ThemeName, Theme> = {
       error: [255, 77, 61],
       ok: [255, 214, 106],
       route: [255, 59, 48],
+      branch: [205, 62, 54],
     },
   },
   green: {
@@ -55,6 +57,7 @@ export const THEMES: Record<ThemeName, Theme> = {
       error: [255, 90, 90],
       ok: [126, 255, 178],
       route: [255, 59, 48],
+      branch: [205, 62, 54],
     },
   },
   ice: {
@@ -73,6 +76,7 @@ export const THEMES: Record<ThemeName, Theme> = {
       error: [255, 96, 96],
       ok: [140, 240, 255],
       route: [255, 59, 48],
+      branch: [205, 62, 54],
     },
   },
 };

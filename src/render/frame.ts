@@ -29,6 +29,11 @@ import {
 import { BrailleCanvas } from "./braille.ts";
 import { Screen, truncate } from "./screen.ts";
 
+export interface FooterPrompt {
+  label: string;
+  value: string;
+}
+
 export interface FrameOptions {
   width: number;
   height: number;
@@ -38,6 +43,7 @@ export interface FrameOptions {
   labels?: boolean;
   grid?: boolean;
   camera?: MapCamera;
+  prompt?: FooterPrompt;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -246,12 +252,78 @@ function drawSegment(
 
     const point = projectPoint(projection, sample);
     if (previousPoint) {
-      canvas.line(previousPoint.x * 2, previousPoint.y * 4, point.x * 2, point.y * 4, 3);
+      canvas.line(previousPoint.x * 2, previousPoint.y * 4, point.x * 2, point.y * 4, 4);
     }
-    canvas.plot(Math.round(point.x * 2), Math.round(point.y * 4), 3);
+    canvas.plot(Math.round(point.x * 2), Math.round(point.y * 4), 4);
 
     previousSample = sample;
     previousPoint = point;
+  }
+}
+
+function drawBranchSegment(
+  canvas: BrailleCanvas,
+  projection: GeoProjection,
+  from: NodeInfo,
+  to: { lat: number | null; lon: number | null },
+): void {
+  if (
+    typeof from.lat !== "number" ||
+    typeof from.lon !== "number" ||
+    typeof to.lat !== "number" ||
+    typeof to.lon !== "number"
+  ) {
+    return;
+  }
+
+  const steps = 96;
+  const samples = sampleGreatCircle(
+    { lat: from.lat, lon: from.lon },
+    { lat: to.lat, lon: to.lon },
+    steps,
+  );
+  let previousSample: GeoPoint | null = null;
+  let previousPoint: { x: number; y: number } | null = null;
+
+  for (let i = 0; i < samples.length; i += 1) {
+    const sample = samples[i];
+    if (!sample) continue;
+    if (previousSample && Math.abs(sample.lon - previousSample.lon) > 180) {
+      previousPoint = null;
+    }
+    const point = projectPoint(projection, sample);
+    if (previousPoint && i % 2 === 0) {
+      canvas.line(previousPoint.x * 2, previousPoint.y * 4, point.x * 2, point.y * 4, 3);
+    }
+    previousSample = sample;
+    previousPoint = point;
+  }
+  if (previousPoint) {
+    canvas.plot(Math.round(previousPoint.x * 2), Math.round(previousPoint.y * 4), 3);
+  }
+}
+
+function drawBranches(
+  canvas: BrailleCanvas,
+  projection: GeoProjection,
+  stations: readonly RouteStation[],
+  lastIndex: number,
+): void {
+  for (let i = 0; i <= lastIndex; i += 1) {
+    const station = stations[i];
+    if (!station) continue;
+    const node = station.node;
+    if (!node.alternates?.length) continue;
+    const previous = i > 0 ? stations[i - 1]?.node : undefined;
+    for (const alternate of node.alternates) {
+      if (previous) {
+        drawBranchSegment(canvas, projection, previous, alternate);
+      }
+      if (typeof alternate.lat === "number" && typeof alternate.lon === "number") {
+        const point = projection.project({ lat: alternate.lat, lon: alternate.lon });
+        canvas.plot(Math.round(point.x * 2), Math.round(point.y * 4), 3);
+      }
+    }
   }
 }
 
@@ -278,6 +350,8 @@ function drawRoute(
     if (from && to) drawSegment(canvas, projection, from, to, fraction);
   }
 
+  drawBranches(canvas, projection, stations, index);
+
   const point = activePoint(stations, reveal);
   if (!point) return;
   const projected = projection.project(point);
@@ -285,7 +359,7 @@ function drawRoute(
   const dotY = projected.y * 4;
   const phase = (now % 1600) / 1600;
   canvas.circle(dotX, dotY, 3 + phase * 9, 2, true);
-  canvas.circle(dotX, dotY, 2, 3, true);
+  canvas.circle(dotX, dotY, 2, 4, true);
 }
 
 export interface MapRect {
@@ -340,6 +414,11 @@ export function cameraForState(state: MissionState, width: number, height: numbe
     const node = station.node;
     if (typeof node.lat === "number" && typeof node.lon === "number") {
       points.push({ lat: node.lat, lon: node.lon });
+    }
+    for (const alternate of node.alternates ?? []) {
+      if (typeof alternate.lat === "number" && typeof alternate.lon === "number") {
+        points.push({ lat: alternate.lat, lon: alternate.lon });
+      }
     }
   }
   return fitCamera(points, aspect);
@@ -482,6 +561,20 @@ function drawMapLabels(
       if (cityKey) seenCities.add(cityKey);
       for (let offset = 0; offset < code.length; offset += 1) occupied.add(key(x + offset, y));
       break;
+    }
+  }
+
+  const lastStation = Math.min(activeStationIndex(stations, reveal), stations.length - 1);
+  for (let i = 0; i <= lastStation; i += 1) {
+    const node = stations[i]?.node;
+    if (!node) continue;
+    for (const alternate of node.alternates ?? []) {
+      if (typeof alternate.lat !== "number" || typeof alternate.lon !== "number") continue;
+      const point = projection.project({ lat: alternate.lat, lon: alternate.lon });
+      const x = rect.x + Math.round(point.x);
+      const y = rect.y + Math.round(point.y);
+      if (occupied.has(key(x, y))) continue;
+      screen.put(x, y, "·", "branch");
     }
   }
 
@@ -821,42 +914,68 @@ function drawDashboard(
   }
 }
 
-function drawFooter(screen: Screen, state: MissionState, now: number): void {
+function drawFooter(
+  screen: Screen,
+  state: MissionState,
+  now: number,
+  prompt?: FooterPrompt,
+): void {
   const width = screen.width;
   const y = screen.height - 3;
   screen.separator(y, "frame");
 
-  const latest = state.logs.at(-1);
-  const ticker =
-    state.phase === "locked"
-      ? "TARGET LOCKED // ORBITAL SOLUTION CONVERGED"
-      : state.phase === "incomplete"
-        ? "TRACE ENDED // TARGET NOT REACHED"
-        : state.error
-          ? `LINK ERROR // ${state.error}`
-          : (latest?.text ?? "AWAITING TELEMETRY");
-  const hints =
-    width >= 112
-      ? "[Q]UIT  [SPACE]PAUSE  [R]ETRACE  [T]HEME"
+  const hints = prompt
+    ? width >= 96
+      ? "[ENTER] TRACE  [ESC] CANCEL"
+      : width >= 64
+        ? "[ENTER] GO  [ESC] CANCEL"
+        : "[↵] GO  [ESC]"
+    : width >= 112
+      ? "[Q]UIT  [SPACE]PAUSE  [R]ETRACE  [N]EW  [T]HEME"
       : width >= 76
-        ? "[Q]UIT  [SPACE]PAUSE"
+        ? "[Q]UIT  [SPACE]PAUSE  [N]EW"
         : "[Q]UIT";
-  const available = Math.max(4, width - hints.length - 9);
-  const role =
-    state.error
-      ? "error"
-      : state.phase === "incomplete"
-        ? "warn"
-        : state.phase === "locked"
-          ? "hot"
-          : latest
-            ? logRole(latest.kind)
-            : "dim";
-  screen.put(2, y + 1, "›", "bright");
-  screen.put(4, y + 1, truncate(ticker, available), role);
-  const keysStart = width - 2 - hints.length;
-  const cursorX = Math.min(4 + Array.from(ticker).length, keysStart - 2);
-  if (Math.floor(now / 450) % 2 === 0) screen.put(cursorX + 1, y + 1, "▌", "bright");
+
+  if (prompt) {
+    const label = `${prompt.label} > `;
+    const labelWidth = Math.min(18, label.length);
+    const valueX = 4 + labelWidth;
+    const valueWidth = Math.max(4, width - hints.length - valueX - 4);
+    const value =
+      prompt.value.length > valueWidth
+        ? `…${prompt.value.slice(-(valueWidth - 1))}`
+        : prompt.value;
+    screen.put(2, y + 1, "›", "bright");
+    screen.put(4, y + 1, truncate(label, labelWidth), "dim");
+    screen.put(valueX, y + 1, value, "hot");
+    screen.put(valueX + value.length, y + 1, "▌", "bright");
+  } else {
+    const latest = state.logs.at(-1);
+    const ticker =
+      state.phase === "locked"
+        ? "TARGET LOCKED // ORBITAL SOLUTION CONVERGED"
+        : state.phase === "incomplete"
+          ? "TRACE ENDED // TARGET NOT REACHED"
+          : state.error
+            ? `LINK ERROR // ${state.error}`
+            : (latest?.text ?? "AWAITING TELEMETRY");
+    const available = Math.max(4, width - hints.length - 9);
+    const role =
+      state.error
+        ? "error"
+        : state.phase === "incomplete"
+          ? "warn"
+          : state.phase === "locked"
+            ? "hot"
+            : latest
+              ? logRole(latest.kind)
+              : "dim";
+    screen.put(2, y + 1, "›", "bright");
+    screen.put(4, y + 1, truncate(ticker, available), role);
+    const keysStart = width - 2 - hints.length;
+    const cursorX = Math.min(4 + Array.from(ticker).length, keysStart - 2);
+    if (Math.floor(now / 450) % 2 === 0) screen.put(cursorX + 1, y + 1, "▌", "bright");
+  }
   screen.putRight(width - 3, y + 1, hints, "dim");
 
   screen.put(2, screen.height - 1, `┤ GOLDENEYE TRACE v${VERSION} ├`, "frame");
@@ -917,7 +1036,7 @@ export function renderFrame(state: MissionState, options: FrameOptions): string[
   screen.put(width - 3, mapBottom, "┤", "frame");
 
   drawDashboard(screen, state, stations, dashTop, compact);
-  drawFooter(screen, state, now);
+  drawFooter(screen, state, now, options.prompt);
 
   return screen.lines(color, theme);
 }

@@ -6,6 +6,7 @@ import { demoMission } from "./demo.ts";
 import { createGeoProvider, isPublicIp, type GeoProvider, type GeoResult } from "./geo-lookup.ts";
 import { smoothCamera, WORLD_CAMERA, type MapCamera } from "./camera.ts";
 import { stripTerminalSequences } from "./keys.ts";
+import { normalizeTarget } from "./target.ts";
 import { renderBoot } from "./render/boot.ts";
 import { cameraForState, renderFrame } from "./render/frame.ts";
 import { createTraceRunner, type TraceProtocol, type TraceRunner } from "./runner.ts";
@@ -178,7 +179,7 @@ Options:
   -v, --version         show version
 
 Requires Node.js 22.18 or newer (TypeScript is stripped natively).
-Press Q to quit, SPACE to pause, R to retrace, T to cycle the theme.`;
+Press Q to quit, SPACE to pause, R to retrace, N (or /) for a new target, T to cycle the theme.`;
 }
 
 function missionTime(state: MissionState, now: number): number {
@@ -213,6 +214,17 @@ function createMission(target: string, now: number, demo: boolean): MissionState
 }
 
 function nodeFromHop(hop: HopLine): NodeInfo {
+  const alternates = (hop.replies ?? [])
+    .filter((reply) => reply.ip !== hop.ip)
+    .map((reply) => ({
+      ip: reply.ip,
+      rttMs: reply.rttMs,
+      city: null,
+      countryCode: null,
+      lat: null,
+      lon: null,
+    }));
+
   return {
     ttl: hop.ttl,
     ip: hop.ip,
@@ -227,6 +239,7 @@ function nodeFromHop(hop: HopLine): NodeInfo {
     lat: null,
     lon: null,
     replyCount: Math.max(1, hop.replies?.length ?? 1),
+    alternates,
   };
 }
 
@@ -283,27 +296,39 @@ function addHop(state: MissionState, hop: NodeInfo, now: number): void {
 
 function applyGeo(state: MissionState, ip: string, geo: GeoResult, now: number): boolean {
   const hop = state.hops.find((candidate) => candidate.ip === ip);
-  if (!hop) return false;
-  hop.city = geo.city;
-  hop.country = geo.country;
-  hop.countryCode = geo.countryCode;
-  hop.org = geo.org;
-  hop.asn = geo.asn;
-  hop.lat = geo.lat;
-  hop.lon = geo.lon;
-  if (geo.city) {
-    addLog(
-      state,
-      "geo",
-      `GEO LOCK  ${geo.city.toUpperCase()} ${geo.countryCode ?? ""}  ${
-        typeof geo.lat === "number" && typeof geo.lon === "number"
-          ? formatCoordinate({ lat: geo.lat, lon: geo.lon })
-          : "COORDINATES UNAVAILABLE"
-      }`,
-      now,
-    );
+  if (hop) {
+    hop.city = geo.city;
+    hop.country = geo.country;
+    hop.countryCode = geo.countryCode;
+    hop.org = geo.org;
+    hop.asn = geo.asn;
+    hop.lat = geo.lat;
+    hop.lon = geo.lon;
+    if (geo.city) {
+      addLog(
+        state,
+        "geo",
+        `GEO LOCK  ${geo.city.toUpperCase()} ${geo.countryCode ?? ""}  ${
+          typeof geo.lat === "number" && typeof geo.lon === "number"
+            ? formatCoordinate({ lat: geo.lat, lon: geo.lon })
+            : "COORDINATES UNAVAILABLE"
+        }`,
+        now,
+      );
+    }
+    return true;
   }
-  return true;
+
+  for (const candidate of state.hops) {
+    const alternate = candidate.alternates?.find((item) => item.ip === ip);
+    if (!alternate) continue;
+    alternate.city = geo.city;
+    alternate.countryCode = geo.countryCode;
+    alternate.lat = geo.lat;
+    alternate.lon = geo.lon;
+    return true;
+  }
+  return false;
 }
 
 async function runMissionOnce(
@@ -334,7 +359,7 @@ async function runMissionOnce(
   addLog(state, "sys", "TRACE COMPLETE", deps.now());
 
   const publicIps = state.hops
-    .map((hop) => hop.ip)
+    .flatMap((hop) => [hop.ip, ...(hop.alternates?.map((alternate) => alternate.ip) ?? [])])
     .filter((ip): ip is string => ip !== null && isPublicIp(ip));
   if (geo && publicIps.length > 0) {
     const geoMap = await geo.lookup(publicIps);
@@ -431,9 +456,19 @@ function startReal(session: Session, target: string, options: CliOptions, deps: 
     void geo
       .locateSelf()
       .then((origin) => {
-        if (generation !== session.generation) return;
-        state.origin = origin ? nodeFromGeo(origin) : null;
-        if (origin?.city) {
+        if (generation !== session.generation || !origin) return;
+        const next = nodeFromGeo(origin);
+        if (state.origin) {
+          next.city ??= state.origin.city;
+          next.country ??= state.origin.country;
+          next.countryCode ??= state.origin.countryCode;
+          next.org ??= state.origin.org;
+          next.asn ??= state.origin.asn;
+          next.lat ??= state.origin.lat;
+          next.lon ??= state.origin.lon;
+        }
+        state.origin = next;
+        if (origin.city) {
           addLog(state, "geo", `ORIGIN  ${origin.city.toUpperCase()} ${origin.countryCode ?? ""}`, deps.now());
         }
       })
@@ -455,8 +490,11 @@ function startReal(session: Session, target: string, options: CliOptions, deps: 
         if (generation !== session.generation) return;
         const node = nodeFromHop(hop);
         addHop(state, node, deps.now());
-        if (geo && typeof node.ip === "string" && isPublicIp(node.ip)) {
-          session.pendingGeo.add(node.ip);
+        if (geo) {
+          const ips = [node.ip, ...(node.alternates?.map((alternate) => alternate.ip) ?? [])];
+          for (const ip of ips) {
+            if (typeof ip === "string" && isPublicIp(ip)) session.pendingGeo.add(ip);
+          }
         }
       },
     })
@@ -545,13 +583,16 @@ async function runInteractive(
     (typeof deps.stdout.rows === "number" && deps.stdout.rows > 0 ? deps.stdout.rows : 40);
   let width = initialWidth;
   let height = initialHeight;
-  const target = options.demo ? demoMission().target : options.target ?? "unknown";
+  let target = options.demo ? demoMission().target : options.target ?? "unknown";
+  let demoMode = options.demo;
+  let inputMode = false;
+  let inputBuffer = "";
   let themeIndex = THEMES.indexOf(options.theme);
   let bootStart = deps.now();
   let lastFrame = bootStart;
   let finished = false;
 
-  const state = options.demo ? createDemoState(bootStart) : createMission(target, bootStart, false);
+  const state = demoMode ? createDemoState(bootStart) : createMission(target, bootStart, false);
   const session: Session = {
     state,
     abort: null,
@@ -589,6 +630,7 @@ async function runInteractive(
           now,
           theme,
           camera: session.camera,
+          ...(inputMode ? { prompt: { label: "NEW TARGET", value: inputBuffer } } : {}),
         });
     write(`\x1b[H${lines.join("\n")}`);
   };
@@ -618,18 +660,34 @@ async function runInteractive(
     resolveExit(code);
   };
 
-  const restart = (): void => {
+  const beginTrace = (nextTarget: string, nextDemo: boolean): void => {
+    const now = deps.now();
+    const previousOrigin = session.state.origin;
     session.generation += 1;
     session.abort?.abort();
     session.abort = null;
+    if (session.demoTimer) {
+      clearInterval(session.demoTimer);
+      session.demoTimer = null;
+    }
+    session.demoIndex = 0;
     session.pendingGeo.clear();
     session.geoBusy = false;
-    session.state = options.demo ? createDemoState(deps.now()) : createMission(target, deps.now(), false);
-    session.state.startedAt = deps.now();
+    demoMode = nextDemo;
+    target = nextTarget;
+    session.state = nextDemo ? createDemoState(now) : createMission(target, now, false);
+    if (!nextDemo && previousOrigin) session.state.origin = previousOrigin;
+    session.state.startedAt = now;
     session.camera = { ...WORLD_CAMERA };
-    lastFrame = deps.now();
-    if (options.demo) startDemo(session, deps.now, () => undefined);
+    lastFrame = now;
+    inputMode = false;
+    inputBuffer = "";
+    if (nextDemo) startDemo(session, deps.now, () => undefined);
     else startReal(session, target, options, deps);
+  };
+
+  const restart = (): void => {
+    beginTrace(demoMode ? demoMission().target : target, demoMode);
   };
   session.restart = restart;
 
@@ -646,7 +704,27 @@ async function runInteractive(
     const text = stripTerminalSequences(chunk.toString());
     const now = deps.now();
     for (const key of text) {
-      if (key === "\u0003" || key === "q" || key === "Q") {
+      if (key === "\u0003") {
+        finish(0);
+        return;
+      }
+      if (inputMode) {
+        if (key === "\u001b") {
+          inputMode = false;
+          inputBuffer = "";
+        } else if (key === "\r" || key === "\n") {
+          const next = normalizeTarget(inputBuffer);
+          inputMode = false;
+          inputBuffer = "";
+          if (next) beginTrace(next, false);
+        } else if (key === "\u007f" || key === "\b") {
+          inputBuffer = inputBuffer.slice(0, -1);
+        } else if ((key.codePointAt(0) ?? 0) >= 0x20 && inputBuffer.length < 200) {
+          inputBuffer += key;
+        }
+        continue;
+      }
+      if (key === "q" || key === "Q") {
         finish(0);
         return;
       }
@@ -654,7 +732,10 @@ async function runInteractive(
         bootStart = now - BOOT_MS;
         continue;
       }
-      if (key === " ") {
+      if (key === "n" || key === "N" || key === "/") {
+        inputMode = true;
+        inputBuffer = "";
+      } else if (key === " ") {
         session.state.paused = !session.state.paused;
       } else if (key === "r" || key === "R") {
         restart();
@@ -747,6 +828,14 @@ export async function main(argv: string[], overrides: Partial<CliDeps> = {}): Pr
   if (!options.demo && !options.target) {
     deps.stderr.write("goldeneye: missing target. Try --demo or --help.\n");
     return 1;
+  }
+  if (options.target && !options.demo) {
+    const normalized = normalizeTarget(options.target);
+    if (!normalized) {
+      deps.stderr.write("goldeneye: target is empty.\n");
+      return 1;
+    }
+    options.target = normalized;
   }
 
   const interactive =

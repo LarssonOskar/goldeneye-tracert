@@ -9,13 +9,14 @@ const DOT_BITS = [
   [0x40, 0x80],
 ] as const;
 
-export type CanvasLevel = 0 | 1 | 2 | 3;
+export type CanvasLevel = 0 | 1 | 2 | 3 | 4;
 
 const LEVEL_ROLES: Record<CanvasLevel, StyleRole> = {
   0: "grid",
   1: "land",
   2: "coast",
-  3: "route",
+  3: "branch",
+  4: "route",
 };
 
 /**

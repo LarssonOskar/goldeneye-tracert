@@ -77,6 +77,17 @@ export function demoMission(): MissionState {
       lon: 4.9041,
       org: "AMS-IX",
       asn: "AS1200",
+      replyCount: 2,
+      alternates: [
+        {
+          ip: "80.249.209.151",
+          rttMs: 24.8,
+          city: "Frankfurt",
+          countryCode: "DE",
+          lat: 50.1109,
+          lon: 8.6821,
+        },
+      ],
     }),
     node({
       ttl: 5,

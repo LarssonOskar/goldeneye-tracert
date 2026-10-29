@@ -60,3 +60,20 @@ test("zooms in on the first city before the route expands", () => {
   assert.match(frame, /ZOOM 20x/);
   assert.match(frame, /59\.33N 18\.07E/);
 });
+
+test("renders a new-target prompt in the footer", () => {
+  const lines = renderFrame(demoMission(), {
+    width: 120,
+    height: 40,
+    color: false,
+    now: 5000,
+    theme: "gold",
+    prompt: { label: "NEW TARGET", value: "https://example.com/status" },
+  });
+
+  for (const line of lines) assert.equal(line.length, 120);
+  const frame = lines.join("\n");
+  assert.match(frame, /NEW TARGET/);
+  assert.match(frame, /example\.com\/status/);
+  assert.match(frame, /\[ENTER\] TRACE/);
+});
