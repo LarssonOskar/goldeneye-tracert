@@ -16,7 +16,7 @@
 ║ ORIGIN Stockholm, SE   →   ACTIVE Tokyo, JP   268.2ms   ROUTE LOCK 100%                ║
 ╠════════════════════════════════════════════════════════════════════════════════════════╣
 ║ › TARGET LOCKED // ORBITAL SOLUTION CONVERGED                                          ║
-╚═┤ GOLDENEYE TRACE v0.4.0 ├═════════════════════════════════════════════════════════════╝
+╚═┤ GOLDENEYE TRACE v0.5.0 ├═════════════════════════════════════════════════════════════╝
 ```
 
 ![GoldenEye Tracert running a locked demo mission](docs/preview.png)
@@ -53,6 +53,27 @@ The input is normalized, so `https://example.com/status`, `example.com/status` a
 The camera starts at world scale, zooms into the first city, and then pulls back as the route grows. The `ZOOM` label in the map header shows the current scale.
 
 ![City-level camera zoom around Stockholm](docs/preview-zoom.png)
+
+### Easter egg: Severnaya spike
+
+When a trace really reaches its target, the uplink occasionally gets a visitor from Severnaya. A data spike animates across the overlay, a real one-shot `ping` is sent to the resolved IP, and Boris delivers the line:
+
+```text
+┤ SPIKE INJECTED ├                                    SEVERNAYA // 1995
+SATELLITE SPIKE // SAT-06                            COUNTER-TRACE BLOCKED
+▁▂▃▄▅▆▇█████████▇▇▆▅▄▃▂▁
+DATA SPIKE  // ACTIVE                                      SLUGHEADS.EXE
+    "Better luck next time, slugheads."
+                                          — BORIS GRISHENKO
+    I AM INVINCIBLE!
+PING 203.0.113.7                                              8.2 ms  //  ACK
+```
+
+The ping is genuine: `ACK` shows the real round-trip time, and `NO ACK` appears when the target filters ICMP. It fires once per target per session, so `r` can retrace without replaying the joke. Targets like the demo's fictional `goldeneye.example` intentionally end in `NO ACK`.
+
+This is a text-only homage to Boris Grishenko and his counter-trace spike in *GoldenEye* (1995). No film stills or other copyrighted assets are embedded.
+
+![Severnaya spike easter egg overlay](docs/preview-spike.png)
 
 ## Requirements
 
@@ -218,6 +239,7 @@ npm run preview:green
 npm run preview:ice
 npm run preview:live
 npm run preview:zoom
+npm run preview:spike
 ```
 
 ## Credits

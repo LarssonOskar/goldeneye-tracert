@@ -1,6 +1,6 @@
 {
   "name": "goldeneye-tracert",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "A traceroute that looks like the GoldenEye satellite uplink terminal",
   "homepage": "https://github.com/LarssonOskar/goldeneye-tracert#readme",
   "repository": {
@@ -32,6 +32,7 @@
     "preview:ice": "node scripts/render-preview.mjs frame ice 120 40 docs/preview-ice.png",
     "preview:live": "node scripts/render-preview.mjs live gold 132 44 docs/preview-live.png",
     "preview:zoom": "node scripts/render-preview.mjs city gold 132 44 docs/preview-zoom.png",
+    "preview:spike": "node scripts/render-preview.mjs spike gold 132 44 docs/preview-spike.png",
     "build:land": "node scripts/build-land.mjs"
   },
   "keywords": [

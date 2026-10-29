@@ -77,3 +77,26 @@ test("renders a new-target prompt in the footer", () => {
   assert.match(frame, /example\.com\/status/);
   assert.match(frame, /\[ENTER\] TRACE/);
 });
+
+test("renders the Severnaya spike easter egg", () => {
+  const lines = renderFrame(demoMission(), {
+    width: 120,
+    height: 40,
+    color: false,
+    now: 4000,
+    theme: "gold",
+    spike: {
+      startedAt: 0,
+      target: "172.67.205.50",
+      ping: { ok: true, rttMs: 8.2 },
+    },
+  });
+
+  for (const line of lines) assert.equal(line.length, 120);
+  const frame = lines.join("\n");
+  assert.match(frame, /SPIKE INJECTED/);
+  assert.match(frame, /Better luck next time, slugheads\./);
+  assert.match(frame, /I AM INVINCIBLE!/);
+  assert.match(frame, /BORIS GRISHENKO/);
+  assert.match(frame, /8\.2 ms/);
+});

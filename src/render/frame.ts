@@ -34,6 +34,17 @@ export interface FooterPrompt {
   value: string;
 }
 
+export interface SpikePing {
+  ok: boolean;
+  rttMs: number | null;
+}
+
+export interface SpikeOverlay {
+  startedAt: number;
+  target: string;
+  ping: SpikePing | null;
+}
+
 export interface FrameOptions {
   width: number;
   height: number;
@@ -44,6 +55,7 @@ export interface FrameOptions {
   grid?: boolean;
   camera?: MapCamera;
   prompt?: FooterPrompt;
+  spike?: SpikeOverlay;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -982,6 +994,82 @@ function drawFooter(
   screen.putRight(width - 3, screen.height - 1, "[ CLASSIFIED ]", "grid");
 }
 
+function drawSpikeOverlay(screen: Screen, spike: SpikeOverlay, now: number): void {
+  const width = Math.min(78, screen.width - 6);
+  const height = 13;
+  if (width < 48 || screen.height < 22) return;
+
+  const x = Math.floor((screen.width - width) / 2);
+  const y = Math.max(2, Math.floor((screen.height - 3 - height) / 2));
+  const elapsed = Math.max(0, now - spike.startedAt);
+
+  screen.fill(x, y, width, height, " ", null);
+  screen.box(x, y, width, height, "route");
+  screen.put(x + 3, y, "┤ SPIKE INJECTED ├", "hot");
+  screen.putRight(x + width - 4, y, "SEVERNAYA // 1995", "dim");
+
+  screen.put(x + 2, y + 1, "SATELLITE SPIKE // SAT-06", "dim");
+  screen.putRight(x + width - 4, y + 1, "COUNTER-TRACE BLOCKED", "warn");
+
+  const waveWidth = width - 4;
+  const phase = Math.floor(elapsed / 70);
+  const levels = "▁▂▃▄▅▆▇█";
+  for (let i = 0; i < waveWidth; i += 1) {
+    const position = i / Math.max(1, waveWidth - 1);
+    const peak = Math.exp(-Math.pow((position - 0.5) * 7, 2));
+    const wobble = (Math.sin((i + phase) * 0.6) + 1) / 2;
+    const level = Math.round(Math.max(0, Math.min(7, peak * 7 + wobble * 0.8)));
+    const role: StyleRole = level >= 6 ? "hot" : level >= 3 ? "route" : "branch";
+    screen.put(x + 2 + i, y + 2, levels[level] ?? "▁", role);
+  }
+
+  screen.put(x + 2, y + 3, "DATA SPIKE", "hot");
+  screen.put(x + 14, y + 3, "//", "dim");
+  screen.put(
+    x + 17,
+    y + 3,
+    "ACTIVE",
+    Math.floor(elapsed / 220) % 2 === 0 ? "warn" : "dim",
+  );
+  screen.putRight(x + width - 4, y + 3, "SLUGHEADS.EXE", "branch");
+
+  const quote = "Better luck next time, slugheads.";
+  const revealed = Math.min(quote.length, Math.max(0, Math.floor((elapsed - 650) / 24)));
+  const visibleQuote = quote.slice(0, revealed);
+  screen.put(x + 4, y + 5, `"${visibleQuote}`, "hot");
+  if (revealed < quote.length) {
+    screen.put(x + 5 + visibleQuote.length, y + 5, "▌", "bright");
+  } else {
+    screen.put(x + 5 + quote.length, y + 5, "\"", "hot");
+    screen.putRight(x + width - 5, y + 6, "— BORIS GRISHENKO", "dim");
+  }
+
+  if (elapsed > 2200) {
+    const role: StyleRole = Math.floor(elapsed / 300) % 2 === 0 ? "hot" : "accent";
+    screen.put(x + 4, y + 8, "I AM INVINCIBLE!", role);
+  }
+
+  const target = truncate(spike.target, Math.max(12, width - 28));
+  if (spike.ping === null) {
+    screen.put(x + 2, y + 10, "PING", "dim");
+    screen.put(x + 7, y + 10, truncate(target, width - 30), "mid");
+    screen.putRight(x + width - 4, y + 10, "WAITING //", "dim");
+  } else if (spike.ping.ok) {
+    screen.put(x + 2, y + 10, "PING", "dim");
+    screen.put(x + 7, y + 10, truncate(target, width - 30), "mid");
+    screen.putRight(
+      x + width - 4,
+      y + 10,
+      `${spike.ping.rttMs === null ? "--" : spike.ping.rttMs.toFixed(1)} ms  //  ACK`,
+      "hot",
+    );
+  } else {
+    screen.put(x + 2, y + 10, "PING", "dim");
+    screen.put(x + 7, y + 10, truncate(target, width - 30), "mid");
+    screen.putRight(x + width - 4, y + 10, "NO ACK", "warn");
+  }
+}
+
 export function renderFrame(state: MissionState, options: FrameOptions): string[] {
   const width = Math.max(40, Math.floor(options.width));
   const height = Math.max(16, Math.floor(options.height));
@@ -1036,6 +1124,7 @@ export function renderFrame(state: MissionState, options: FrameOptions): string[
   screen.put(width - 3, mapBottom, "┤", "frame");
 
   drawDashboard(screen, state, stations, dashTop, compact);
+  if (options.spike) drawSpikeOverlay(screen, options.spike, now);
   drawFooter(screen, state, now, options.prompt);
 
   return screen.lines(color, theme);

@@ -6,9 +6,10 @@ import { demoMission } from "./demo.ts";
 import { createGeoProvider, isPublicIp, type GeoProvider, type GeoResult } from "./geo-lookup.ts";
 import { smoothCamera, WORLD_CAMERA, type MapCamera } from "./camera.ts";
 import { stripTerminalSequences } from "./keys.ts";
+import { pingOnce } from "./ping.ts";
 import { normalizeTarget } from "./target.ts";
 import { renderBoot } from "./render/boot.ts";
-import { cameraForState, renderFrame } from "./render/frame.ts";
+import { cameraForState, renderFrame, type SpikePing } from "./render/frame.ts";
 import { createTraceRunner, type TraceProtocol, type TraceRunner } from "./runner.ts";
 import { formatCoordinate } from "./geo.ts";
 import type { HopLine } from "./traceroute.ts";
@@ -587,6 +588,8 @@ async function runInteractive(
   let demoMode = options.demo;
   let inputMode = false;
   let inputBuffer = "";
+  let spike: { startedAt: number; target: string; ping: SpikePing | null } | null = null;
+  const spikedTargets = new Set<string>();
   let themeIndex = THEMES.indexOf(options.theme);
   let bootStart = deps.now();
   let lastFrame = bootStart;
@@ -631,6 +634,15 @@ async function runInteractive(
           theme,
           camera: session.camera,
           ...(inputMode ? { prompt: { label: "NEW TARGET", value: inputBuffer } } : {}),
+          ...(!inputMode && spike
+            ? {
+                spike: {
+                  startedAt: spike.startedAt,
+                  target: spike.target,
+                  ping: spike.ping,
+                },
+              }
+            : {}),
         });
     write(`\x1b[H${lines.join("\n")}`);
   };
@@ -682,8 +694,24 @@ async function runInteractive(
     lastFrame = now;
     inputMode = false;
     inputBuffer = "";
+    spike = null;
     if (nextDemo) startDemo(session, deps.now, () => undefined);
     else startReal(session, target, options, deps);
+  };
+
+  const triggerSpike = (): void => {
+    if (spikedTargets.has(target)) return;
+    spikedTargets.add(target);
+    const spikeTarget = target;
+    const address = session.state.targetIp ?? target;
+    spike = { startedAt: deps.now(), target: target, ping: null };
+    void pingOnce(address, 1500).then((result) => {
+      if (!spike || spike.target !== spikeTarget) return;
+      spike = {
+        ...spike,
+        ping: { ok: result.ok, rttMs: result.rttMs },
+      };
+    });
   };
 
   const restart = (): void => {
@@ -767,12 +795,14 @@ async function runInteractive(
       }
       advance(session, options, deps, dt, () => {
         if (options.beep) write("\x07");
+        triggerSpike();
       });
       session.camera = smoothCamera(
         session.camera,
         cameraForState(session.state, width, height),
         dt,
       );
+      if (spike && now - spike.startedAt > 5600) spike = null;
     }
     draw(now);
   }, FRAME_MS);

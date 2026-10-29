@@ -39,13 +39,26 @@ const frame =
             now: 5_200,
             theme,
           })
-        : renderFrame(demoMission(), {
-            width,
-            height,
-            color: true,
-            now: 12_400,
-            theme,
-          });
+        : mode === "spike"
+          ? renderFrame(demoMission(), {
+              width,
+              height,
+              color: true,
+              now: 4_500,
+              theme,
+              spike: {
+                startedAt: 0,
+                target: "172.67.205.50",
+                ping: { ok: true, rttMs: 8.2 },
+              },
+            })
+          : renderFrame(demoMission(), {
+              width,
+              height,
+              color: true,
+              now: 12_400,
+              theme,
+            });
 
 function cityMission() {
   const state = demoMission();
