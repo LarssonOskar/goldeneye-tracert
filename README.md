@@ -16,7 +16,7 @@
 ║ ORIGIN Stockholm, SE   →   ACTIVE Tokyo, JP   268.2ms   ROUTE LOCK 100%                ║
 ╠════════════════════════════════════════════════════════════════════════════════════════╣
 ║ › TARGET LOCKED // ORBITAL SOLUTION CONVERGED                                          ║
-╚═┤ GOLDENEYE TRACE v0.6.0 ├═════════════════════════════════════════════════════════════╝
+╚═┤ GOLDENEYE TRACE v0.6.1 ├═════════════════════════════════════════════════════════════╝
 ```
 
 ![GoldenEye Tracert running a locked demo mission](docs/preview.png)
@@ -30,7 +30,7 @@ The route is real. The satellite theater is not.
 - Defaults to ICMP probes on macOS/Windows, which reaches targets that filter UDP; use `--protocol udp` to match a plain `traceroute` run.
 - Looks up each public hop through [ip-api.com](https://ip-api.com/) in batches, with [ipwho.is](https://ipwho.is/) as a fallback. Results are cached for seven days.
 - Locates your own public origin through [ifconfig.co](https://ifconfig.co/), so the route starts where you are.
-- Draws a Natural Earth world map in Unicode braille, with a red great-circle route, pulsing reticle, city codes and live telemetry.
+- Draws a Natural Earth world map in Unicode braille, with a red great-circle route, pulsing reticle, city codes and live telemetry. Land stippling adapts to the available dot resolution, so small windows keep recognizable continents.
 - Uses an adaptive camera: start at world scale, zoom into the first city, then pull back just enough to keep the growing route visible. The current scale is shown as `ZOOM` in the map header.
 - Interpolates great-circle arcs and splits them at the antimeridian, so a Honolulu → Tokyo hop wraps across the Pacific instead of cutting across the whole map.
 - Reports `TARGET LOCKED` only when the final hop really is the resolved target. Otherwise you get `NO TARGET LOCK`.

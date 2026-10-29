@@ -194,6 +194,13 @@ function drawTerrain(
   const latSpan = bounds.north - bounds.south;
   const lonTolerance = (lonSpan / canvas.dotWidth) * 1.1;
   const latTolerance = (latSpan / canvas.dotHeight) * 1.1;
+  // Keep roughly the same number of interior land dots regardless of terminal
+  // size. Small windows otherwise sample only a faint handful of land cells.
+  const landDensity = clamp(
+    600 / Math.max(1, canvas.dotWidth * canvas.dotHeight * 0.3),
+    0.08,
+    0.3,
+  );
 
   for (let y = 0; y < canvas.dotHeight; y += 1) {
     const lat = bounds.north - ((y + 0.5) / canvas.dotHeight) * latSpan;
@@ -218,7 +225,7 @@ function drawTerrain(
 
         if (coastal) {
           canvas.plot(x, y, 2);
-        } else if (noise(x, y) < 0.08) {
+        } else if (noise(x, y) < landDensity) {
           canvas.plot(x, y, 1);
         }
       } else if (
