@@ -26,7 +26,7 @@ import {
   type RouteStation,
   type ThemeName,
 } from "../types.ts";
-import { BrailleCanvas } from "./braille.ts";
+import { BrailleCanvas, type CanvasLevel } from "./braille.ts";
 import { Screen, truncate } from "./screen.ts";
 
 export interface FooterPrompt {
@@ -388,6 +388,7 @@ function drawRoute(
   stations: readonly RouteStation[],
   reveal: number,
   now: number,
+  locked = false,
 ): void {
   if (stations.length < 2) return;
   const index = activeStationIndex(stations, reveal);
@@ -413,8 +414,10 @@ function drawRoute(
   const dotX = projected.x * 2;
   const dotY = projected.y * 4;
   const phase = (now % 1600) / 1600;
-  canvas.circle(dotX, dotY, 3 + phase * 9, 2, true);
-  canvas.circle(dotX, dotY, 2, 4, true);
+  const pulseLevel: CanvasLevel = locked ? 5 : 2;
+  const coreLevel: CanvasLevel = locked ? 5 : 4;
+  canvas.circle(dotX, dotY, 3 + phase * 9, pulseLevel, true);
+  canvas.circle(dotX, dotY, 2, coreLevel, true);
 }
 
 export interface MapRect {
@@ -1173,7 +1176,7 @@ export function renderFrame(state: MissionState, options: FrameOptions): string[
   const projection = createProjection(rect.w, rect.h, bounds);
   const canvas = new BrailleCanvas(rect.w, rect.h);
   drawTerrain(canvas, bounds, grid, gridStep);
-  drawRoute(canvas, projection, stations, state.reveal, now);
+  drawRoute(canvas, projection, stations, state.reveal, now, state.phase === "locked");
   canvas.render(screen, rect.x, rect.y);
 
   if (labels) {
