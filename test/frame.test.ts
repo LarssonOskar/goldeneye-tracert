@@ -86,20 +86,19 @@ test("renders the Severnaya spike easter egg", () => {
     now: 4000,
     theme: "gold",
     spike: {
+      stage: "compose",
       startedAt: 0,
       target: "172.67.205.50",
-      ping: { ok: true, rttMs: 8.2 },
+      ping: null,
     },
   });
 
   for (const line of lines) assert.equal(line.length, 120);
   const frame = lines.join("\n");
-  assert.match(frame, /SPIKE SENT/);
-  assert.doesNotMatch(frame, /SPIKE INJECTED/);
+  assert.match(frame, /SPIKE READY/);
   assert.match(frame, /Better luck next time, slugheads\./);
-  assert.doesNotMatch(frame, /INVINCIBLE/);
   assert.match(frame, /BORIS GRISHENKO/);
-  assert.match(frame, /8\.2 ms/);
+  assert.match(frame, /PRESS ENTER/);
   assert.match(frame, /\[S\]SPIKE/);
 });
 
@@ -123,6 +122,28 @@ test("renders the spike confirmation prompt", () => {
   assert.match(frame, /\[ESC\] CANCEL/);
 });
 
+test("renders the Severnaya sent box", () => {
+  const lines = renderFrame(demoMission(), {
+    width: 120,
+    height: 40,
+    color: false,
+    now: 4000,
+    theme: "gold",
+    spike: {
+      stage: "sent",
+      startedAt: 0,
+      target: "172.67.205.50",
+      ping: { ok: true, rttMs: 8.2 },
+    },
+  });
+
+  for (const line of lines) assert.equal(line.length, 120);
+  const frame = lines.join("\n");
+  assert.match(frame, /SPIKE SENT/);
+  assert.match(frame, /8\.2 ms/);
+  assert.doesNotMatch(frame, /Better luck next time/);
+});
+
 test("types the Severnaya overlay in over time", () => {
   const linesAt = (now: number): string =>
     renderFrame(demoMission(), {
@@ -132,6 +153,7 @@ test("types the Severnaya overlay in over time", () => {
       now,
       theme: "gold",
       spike: {
+        stage: "compose",
         startedAt: 0,
         target: "172.67.205.50",
         ping: null,
@@ -146,7 +168,7 @@ test("types the Severnaya overlay in over time", () => {
   assert.match(late, /Better luck next time, slugheads\./);
   assert.match(late, /BORIS GRISHENKO/);
   assert.doesNotMatch(late, /INVINCIBLE/);
-  assert.match(late, /WAITING/);
+  assert.match(late, /PRESS ENTER/);
 });
 
 test("shows an available update in the footer", () => {

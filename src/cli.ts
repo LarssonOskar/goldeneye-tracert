@@ -26,7 +26,7 @@ import {
 
 const BOOT_MS = 2100;
 const FRAME_MS = 66;
-const SPIKE_MS = 9000;
+const SPIKE_SENT_MS = 5000;
 const THEMES: ThemeName[] = ["gold", "green", "ice"];
 
 interface CliOutput {
@@ -600,8 +600,7 @@ async function runInteractive(
   let demoMode = options.demo;
   let inputMode = false;
   let inputBuffer = "";
-  let spikeConfirm = false;
-  let spike: { startedAt: number; target: string; ping: SpikePing | null } | null = null;
+  let spike: { stage: "compose" | "sent"; startedAt: number; target: string; ping: SpikePing | null } | null = null;
   let availableUpdate: UpdateInfo | null = null;
   let themeIndex = THEMES.indexOf(options.theme);
   let bootStart = deps.now();
@@ -648,7 +647,7 @@ async function runInteractive(
           camera: session.camera,
           ...(inputMode
             ? { prompt: { label: "NEW TARGET", value: inputBuffer } }
-            : spikeConfirm
+            : spike?.stage === "compose"
               ? {
                   prompt: {
                     label: "SEND SPIKE",
@@ -660,6 +659,7 @@ async function runInteractive(
           ...(!inputMode && spike
             ? {
                 spike: {
+                  stage: spike.stage,
                   startedAt: spike.startedAt,
                   target: spike.target,
                   ping: spike.ping,
@@ -754,21 +754,24 @@ async function runInteractive(
     lastFrame = now;
     inputMode = false;
     inputBuffer = "";
-    spikeConfirm = false;
     spike = null;
     if (nextDemo) startDemo(session, deps.now, () => undefined);
     else startReal(session, target, options, deps);
   };
 
   const sendSpike = (): void => {
-    spikeConfirm = false;
-    if (spike || session.state.phase !== "locked") return;
+    if (spike?.stage !== "compose" || session.state.phase !== "locked") return;
     const spikeTarget = target;
     const address = session.state.targetIp ?? target;
     addLog(session.state, "spike", "SPIKE SENT // COUNTER-TRACE BLOCKED", deps.now());
-    spike = { startedAt: deps.now(), target: spikeTarget, ping: null };
+    spike = {
+      stage: "sent",
+      startedAt: deps.now(),
+      target: spikeTarget,
+      ping: null,
+    };
     void pingOnce(address, 1500).then((result) => {
-      if (!spike || spike.target !== spikeTarget) return;
+      if (!spike || spike.stage !== "sent" || spike.target !== spikeTarget) return;
       spike = {
         ...spike,
         ping: { ok: result.ok, rttMs: result.rttMs },
@@ -818,12 +821,16 @@ async function runInteractive(
         finish(0);
         return;
       }
-      if (spikeConfirm) {
+      if (spike?.stage === "compose") {
         if (key === "\u001b") {
-          spikeConfirm = false;
+          spike = null;
         } else if (key === "\r" || key === "\n") {
           sendSpike();
         }
+        continue;
+      }
+      if (spike?.stage === "sent") {
+        if (key === "\u001b") spike = null;
         continue;
       }
       if (key === "\u001b" && spike) {
@@ -842,7 +849,9 @@ async function runInteractive(
       } else if (key === "r" || key === "R") {
         restart();
       } else if (key === "s" || key === "S") {
-        if (!spike && session.state.phase === "locked") spikeConfirm = true;
+        if (!spike && session.state.phase === "locked") {
+          spike = { stage: "compose", startedAt: deps.now(), target, ping: null };
+        }
       } else if (key === "u" || key === "U") {
         if (availableUpdate) applyUpdate();
       } else if (key === "t" || key === "T") {
@@ -879,7 +888,7 @@ async function runInteractive(
         cameraForState(session.state, width, height),
         dt,
       );
-      if (spike && now - spike.startedAt > SPIKE_MS) spike = null;
+      if (spike?.stage === "sent" && now - spike.startedAt > SPIKE_SENT_MS) spike = null;
     }
     draw(now);
   }, FRAME_MS);

@@ -16,7 +16,7 @@
 ║ ORIGIN Stockholm, SE   →   ACTIVE Tokyo, JP   268.2ms   ROUTE LOCK 100%                ║
 ╠════════════════════════════════════════════════════════════════════════════════════════╣
 ║ › TARGET LOCKED // ORBITAL SOLUTION CONVERGED                                          ║
-╚═┤ GOLDENEYE TRACE v0.7.5 ├═════════════════════════════════════════════════════════════╝
+╚═┤ GOLDENEYE TRACE v0.7.6 ├═════════════════════════════════════════════════════════════╝
 ```
 
 ![GoldenEye Tracert running a locked demo mission](docs/preview.png)
@@ -56,23 +56,29 @@ The camera starts at world scale, zooms into the first city, and then pulls back
 
 ### Easter egg: Severnaya spike
 
-When a trace really reaches its target, the uplink quietly arms a shortcut. Press `s`, then Enter to send a Severnaya spike: a data spike writes itself across a compact overlay, a real one-shot `ping` is sent to the resolved IP, and Boris delivers the line:
+When a trace really reaches its target, press `s` to open a compact box where the spike message types itself out slowly:
 
 ```text
-› SEND SPIKE > 203.0.113.7                          [ENTER] SEND  [ESC] CANCEL
-```
-
-```text
-┤ SPIKE SENT ├                                        SEVERNAYA // 1995
-SATELLITE SPIKE // SAT-06                            COUNTER-TRACE BLOCKED
+┤ SPIKE READY ├                                      SEVERNAYA // 1995
+SATELLITE SPIKE // SAT-06                          COUNTER-TRACE READY
 ▁▂▃▄▅▆▇█████████▇▇▆▅▄▃▂▁
-DATA SPIKE  // ACTIVE                                      SLUGHEADS.EXE
+DATA SPIKE  // READY                                      SLUGHEADS.EXE
     "Better luck next time, slugheads."
                                           — BORIS GRISHENKO
-PING 203.0.113.7                                              8.2 ms  //  ACK
+TARGET 203.0.113.7                                              PRESS ENTER
 ```
 
-The ping is genuine: `ACK` shows the real round-trip time, and `NO ACK` appears when the target filters ICMP. The event log records `SPIKE SENT // COUNTER-TRACE BLOCKED`. The box stays for about nine seconds, then disappears; press Esc to dismiss it early. Press `s` and Enter again to replay it. Targets like the demo's fictional `goldeneye.example` intentionally end in `NO ACK`.
+Press Enter to send it. The compose box closes and a `SPIKE SENT` box appears for five seconds:
+
+```text
+┤ SPIKE SENT ├                                       SEVERNAYA // 1995
+SATELLITE SPIKE // SAT-06                            COUNTER-TRACE BLOCKED
+PING 203.0.113.7                                              8.2 ms  //  ACK
+SPIKE SENT // COUNTER-TRACE BLOCKED
+PRESS ESC TO DISMISS
+```
+
+Esc closes either box early. The ping is genuine: `ACK` shows the real round-trip time, and `NO ACK` appears when the target filters ICMP. The event log records `SPIKE SENT // COUNTER-TRACE BLOCKED`. Press `s` and Enter again to replay it. Targets like the demo's fictional `goldeneye.example` intentionally end in `NO ACK`.
 
 This is a text-only homage to Boris Grishenko and his counter-trace spike in *GoldenEye* (1995). No film stills or other copyrighted assets are embedded.
 

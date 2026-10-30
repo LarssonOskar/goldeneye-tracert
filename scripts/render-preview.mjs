@@ -47,9 +47,10 @@ const frame =
               now: 4_500,
               theme,
               spike: {
+                stage: "compose",
                 startedAt: 0,
                 target: "172.67.205.50",
-                ping: { ok: true, rttMs: 8.2 },
+                ping: null,
               },
             })
           : renderFrame(demoMission(), {
