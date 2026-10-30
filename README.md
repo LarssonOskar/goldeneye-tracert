@@ -16,7 +16,7 @@
 ║ ORIGIN Stockholm, SE   →   ACTIVE Tokyo, JP   268.2ms   ROUTE LOCK 100%                ║
 ╠════════════════════════════════════════════════════════════════════════════════════════╣
 ║ › TARGET LOCKED // ORBITAL SOLUTION CONVERGED                                          ║
-╚═┤ GOLDENEYE TRACE v0.7.4 ├═════════════════════════════════════════════════════════════╝
+╚═┤ GOLDENEYE TRACE v0.7.5 ├═════════════════════════════════════════════════════════════╝
 ```
 
 ![GoldenEye Tracert running a locked demo mission](docs/preview.png)

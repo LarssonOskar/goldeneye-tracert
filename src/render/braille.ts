@@ -75,9 +75,13 @@ export class BrailleCanvas {
     const current = this.levels[index] ?? 0;
     if (level > current) this.levels[index] = level;
     if (level >= 2) {
-      this.overlayBits[index] = (this.overlayBits[index] ?? 0) | bit;
       const currentOverlay = this.overlayLevel[index] ?? 0;
-      if (level > currentOverlay) this.overlayLevel[index] = level;
+      if (level > currentOverlay) {
+        this.overlayBits[index] = bit;
+        this.overlayLevel[index] = level;
+      } else if (level === currentOverlay) {
+        this.overlayBits[index] = (this.overlayBits[index] ?? 0) | bit;
+      }
     }
   }
 
