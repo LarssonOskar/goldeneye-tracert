@@ -1126,39 +1126,43 @@ function drawSpikeOverlay(screen: Screen, spike: SpikeOverlay, now: number): voi
     screen.put(left + 8, y + 9, typed(target, 1450, 14), "mid");
     screen.put(right - 14, y + 9, typed("PRESS ENTER", 1600, 18), "hot");
   } else {
-    const width = Math.min(56, screen.width - 6);
-    const height = 9;
-    if (width < 44 || screen.height < 18) return;
+    const progress = Math.min(1, elapsed / 1000);
+    const stepped = Math.ceil(progress * 6) / 6;
+    const width = Math.max(8, Math.round(56 * stepped));
+    const height = Math.max(4, Math.round(9 * stepped));
+    if (width < 12 || height < 5 || screen.width < 44 || screen.height < 18) return;
 
     const x = Math.floor((screen.width - width) / 2);
     const y = Math.max(2, Math.floor((screen.height - 3 - height) / 2));
     const left = x + 3;
     const right = x + width - 4;
-    const elapsed = Math.max(0, now - spike.startedAt);
 
     screen.fill(x, y, width, height, " ", null);
     screen.box(x, y, width, height, "branch");
-    screen.put(left, y, "┤ SPIKE SENT ├", "hot");
-    const place = "SEVERNAYA // 1995";
-    screen.put(right - place.length, y, place, "dim");
 
-    screen.put(left, y + 1, "SATELLITE SPIKE // SAT-06", "dim");
-    screen.put(right - 20, y + 1, "COUNTER-TRACE BLOCKED", "warn");
+    if (stepped >= 1) {
+      screen.put(left, y, "┤ SPIKE SENT ├", "hot");
+      const place = "SEVERNAYA // 1995";
+      screen.put(right - place.length, y, place, "dim");
 
-    const target = truncate(spike.target, Math.max(12, width - 27));
-    screen.put(left, y + 3, "PING", "dim");
-    screen.put(left + 6, y + 3, target, "mid");
-    if (spike.ping === null) {
-      screen.put(right - 9, y + 3, "WAITING //", "dim");
-    } else if (spike.ping.ok) {
-      const status = `${spike.ping.rttMs === null ? "--" : spike.ping.rttMs.toFixed(1)} ms  //  ACK`;
-      screen.put(right - status.length, y + 3, status, "hot");
-    } else {
-      screen.put(right - 6, y + 3, "NO ACK", "warn");
+      screen.put(left, y + 1, "SATELLITE SPIKE // SAT-06", "dim");
+      screen.put(right - 20, y + 1, "COUNTER-TRACE BLOCKED", "warn");
+
+      const target = truncate(spike.target, Math.max(12, width - 27));
+      screen.put(left, y + 3, "PING", "dim");
+      screen.put(left + 6, y + 3, target, "mid");
+      if (spike.ping === null) {
+        screen.put(right - 9, y + 3, "WAITING //", "dim");
+      } else if (spike.ping.ok) {
+        const status = `${spike.ping.rttMs === null ? "--" : spike.ping.rttMs.toFixed(1)} ms  //  ACK`;
+        screen.put(right - status.length, y + 3, status, "hot");
+      } else {
+        screen.put(right - 6, y + 3, "NO ACK", "warn");
+      }
+
+      screen.put(left, y + 5, "SPIKE SENT // COUNTER-TRACE BLOCKED", "branch");
+      screen.put(left, y + 6, "PRESS ESC TO DISMISS", "dim");
     }
-
-    screen.put(left, y + 5, "SPIKE SENT // COUNTER-TRACE BLOCKED", "branch");
-    screen.put(left, y + 6, "PRESS ESC TO DISMISS", "dim");
   }
 }
 

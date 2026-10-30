@@ -16,7 +16,7 @@
 ║ ORIGIN Stockholm, SE   →   ACTIVE Tokyo, JP   268.2ms   ROUTE LOCK 100%                ║
 ╠════════════════════════════════════════════════════════════════════════════════════════╣
 ║ › TARGET LOCKED // ORBITAL SOLUTION CONVERGED                                          ║
-╚═┤ GOLDENEYE TRACE v0.7.6 ├═════════════════════════════════════════════════════════════╝
+╚═┤ GOLDENEYE TRACE v0.7.7 ├═════════════════════════════════════════════════════════════╝
 ```
 
 ![GoldenEye Tracert running a locked demo mission](docs/preview.png)
@@ -68,7 +68,7 @@ DATA SPIKE  // READY                                      SLUGHEADS.EXE
 TARGET 203.0.113.7                                              PRESS ENTER
 ```
 
-Press Enter to send it. The compose box closes and a `SPIKE SENT` box appears for five seconds:
+Press Enter to send it. The compose box closes and a `SPIKE SENT` box grows from the center over about a second and then stays for five seconds:
 
 ```text
 ┤ SPIKE SENT ├                                       SEVERNAYA // 1995
