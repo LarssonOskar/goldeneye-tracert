@@ -414,7 +414,7 @@ function drawRoute(
   const dotX = projected.x * 2;
   const dotY = projected.y * 4;
   const phase = (now % 1600) / 1600;
-  const pulseLevel: CanvasLevel = locked ? 5 : 2;
+  const pulseLevel: CanvasLevel = locked ? 4 : 2;
   const coreLevel: CanvasLevel = locked ? 5 : 4;
   canvas.circle(dotX, dotY, 3 + phase * 9, pulseLevel, true);
   canvas.circle(dotX, dotY, 2, coreLevel, true);
